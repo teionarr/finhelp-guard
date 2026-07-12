@@ -2,7 +2,7 @@
 
 This is a pre-1.0 project; the API may change. Breaking changes are flagged.
 
-## [0.1.0] — unreleased
+## [0.1.0]
 
 Support-ops guardrail + eval harness with a tool-calling triage agent, verified against a
 real model, hardened across four adversarial red-team rounds.
