@@ -5,8 +5,8 @@ guardrails-ai>=0.6.8       # real guardrails framework — see finhelp_guard/gua
 langgraph>=1.0             # agent orchestration (finhelp_guard/graph.py)
 langchain>=0.3
 langchain-openai>=0.2      # AzureChatOpenAI / ChatOpenAI
-ragas>=0.2                 # Faithfulness judge (live groundedness)
-deepeval>=1.0              # MisuseMetric / FaithfulnessMetric (live)
+ragas>=0.2                 # swap-in target for the groundedness judge (NOT yet imported)
+deepeval>=1.0              # swap-in target for the advice/faithfulness judge (NOT yet imported)
 statsmodels>=0.14          # cross-check for the pure-Python stats
 langfuse>=3.0              # tracing (optional)
 # presidio-analyzer / presidio-anonymizer  # PII rail (stretch; needs a spaCy model)

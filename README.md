@@ -3,7 +3,7 @@
 **A portable eval + guardrail harness for a support-ops assistant at a regulated broker.**
 The agent is deliberately thin; the point is the *harness* — the rails, the interval-based acceptance criteria, and the regression gate that let you ship an AI ops-assist tool a compliance officer would sign off on.
 
-![tests](https://img.shields.io/badge/tests-43%20unit%20%2B%204%20integration-brightgreen) ![license](https://img.shields.io/badge/license-MIT-green) ![python](https://img.shields.io/badge/python-3.10+-blue) ![data](https://img.shields.io/badge/data-synthetic%20%2B%20public-lightgrey) ![built with](https://img.shields.io/badge/built%20with-Guardrails%20AI%20%C2%B7%20LangGraph%20%C2%B7%20BM25-8a2be2)
+![tests](https://img.shields.io/badge/tests-47%20unit%20%2B%204%20integration-brightgreen) ![license](https://img.shields.io/badge/license-MIT-green) ![python](https://img.shields.io/badge/python-3.10+-blue) ![data](https://img.shields.io/badge/data-synthetic%20%2B%20public-lightgrey) ![built with](https://img.shields.io/badge/built%20with-Guardrails%20AI%20%C2%B7%20LangGraph%20%C2%B7%20BM25-8a2be2)
 
 **Composes the standard OSS stack, not a from-scratch reinvention.** The same rail logic runs three ways — a dependency-free gate (fast, keyless), inside a real [Guardrails AI](https://github.com/guardrails-ai/guardrails) `Guard()`, or behind an LLM judge ([DeepEval](https://github.com/confident-ai/deepeval) / [Ragas](https://github.com/explodinggradients/ragas)); retrieval is [rank_bm25](https://github.com/dorianbrown/rank_bm25), orchestration is [LangGraph](https://github.com/langchain-ai/langgraph). You pick the stack; the rules and acceptance criteria stay identical.
 
@@ -22,7 +22,7 @@ python -m finhelp_guard --demo          # just the guardrail gate on 3 canned dr
 python evals/run_evals.py               # dev gate (GREEN) + held-out report
 python evals/run_evals.py --inject-regression   # disable a rail -> dev gate RED
 python evals/run_evals.py --compare     # paired McNemar: full vs regressed rails
-pip install -r requirements-dev.txt && pytest -q   # 43 unit tests (keyless)
+pip install -r requirements-dev.txt && pytest -q   # 47 unit tests (keyless)
 python evals/calibrate.py                          # judge threshold sweep + ROC/PR/AUC/ECE (keyless)
 
 # run the same rails inside the real Guardrails AI framework:
@@ -54,7 +54,7 @@ T-3: Should I buy Tesla with my balance right now?
 
 The loop is **model-agnostic**: `--triage` uses a deterministic scripted model so the whole thing (tools, gate, routing, trace) runs in CI with **0 keys / 0 spend**; `--triage --live` swaps in a real LLM (Azure/OpenAI/**Nebius**, or a local Ollama/vLLM server) via the same interface. Tools (`finhelp_guard/tools.py`) are a **mocked CRM/ticketing backend** — in production they become a Salesforce Service Cloud / Zendesk client behind the same signatures, no agent change.
 
-> **✅ Verified against a real model** — `--triage --live` and the judge were run against `Qwen/Qwen3-30B-A3B-Instruct` via Nebius. See **[docs/live-run.md](docs/live-run.md)** for the transcript. That run surfaced two real findings: (1) a grounding gap — a balance the model correctly pulled from the CRM tool was wrongly flagged, now fixed (tool outputs count as grounding evidence); (2) the live judge lifts held-out advice/groundedness recall **0.000 → 1.000** but pushes false-refusal to **1.000 (n=2)** — the precision/recall tradeoff, with evidence, that the harness exists to manage.
+> **✅ Verified against a real model** — `--triage --live` and the judge were run against `Qwen/Qwen3-30B-A3B-Instruct-2507` via Nebius ([docs/live-run.md](docs/live-run.md)). That surfaced real findings that then drove fixes: a CRM balance the model pulled was wrongly flagged (fixed — tool outputs count as grounding); a **cross-account data leak** (fixed — authorization below the model); and the groundedness judge **over-blocking** (fixed — layered policy). On the hardened build the live judge lifts held-out advice recall **0.000 → 1.000** and grounded recall **0.000 → 0.667**, at **0.000** false-refusal (n=2). Full honesty register in **[LIMITATIONS.md](LIMITATIONS.md)**.
 
 ## The same rules, three runtimes (this is the "compose, don't reinvent" point)
 The rail logic in `finhelp_guard/rails/` is written once and reused everywhere:
@@ -94,7 +94,7 @@ Two design choices are the whole point — and the two things a reviewer should 
     grounded_recall      0.000 [0.000, 0.561]  (n=3)    # no-digit + cross-fact fabrications slip past
 ```
 
-**Judge calibration (not a hardcoded 0.5).** `evals/calibrate.py` sweeps the judge threshold and reports **ROC / PR / AUC / ECE** + the operating point that maximizes recall subject to a false-refusal ceiling (on real committed scores it recommends `threshold=0.90`, ROC-AUC 1.0, ECE 0.035), applied via `FINHELP_JUDGE_THRESHOLD`. The full gold-set workflow — rubric, stratified candidates, **Cohen's κ** — is built in [`data/gold/`](data/gold/README.md); the only remaining input is ~2h of human labeling ([ROADMAP](ROADMAP.md)). This is what turns "author-labelled toy" into "calibrated against a defensible gold set."
+**Judge calibration (not a hardcoded 0.5), per judge.** `evals/calibrate.py --judge {advice,grounded}` sweeps each judge's threshold and reports **ROC / PR-AUC / ECE** + the operating point (max recall s.t. a false-refusal ceiling), applied via **separate** env vars (`FINHELP_ADVICE_THRESHOLD` / `FINHELP_GROUNDED_THRESHOLD` — a single shared threshold was a bug). Honestly: the **advice** judge is trivially separable on the in-distribution set (AUC 1.0 — *not* a hard result); the **groundedness** judge is the meaningful one and is genuinely imperfect (**ROC-AUC ≈ 0.84, ECE ≈ 0.11** — it false-positives a benign reply at 1.0, so no threshold is both safe and useful; see [LIMITATIONS.md](LIMITATIONS.md)). The gold-set workflow (rubric, stratified candidates, **Cohen's κ**) is built in [`data/gold/`](data/gold/README.md); the remaining input is ~2h of human labeling — until then the calibration uses **interim author labels** and is illustrative ([ROADMAP](ROADMAP.md)).
 
 That gap is not a bug to hide — it's the argument for the live LLM judge. `--compare` runs a real paired **McNemar** test (exact) between the full rails and an advice-rail-disabled version on the same items (b=12, c=0, p≈0.0005) — the version-to-version regression test.
 
@@ -109,11 +109,13 @@ A **rail** is a pure function `(draft, contexts) -> RailResult`; the gate runs t
 
 ## The two rails ↔ the failure each prevents
 
-| Rail | Prevents | Offline detector | Live |
+| Rail | Prevents | Offline detector (built) | Live judge (swap-in — stretch) |
 |---|---|---|---|
-| `no_advice` | "Is TSLA a buy?" → unlicensed personalized advice | EN+ES advice-language patterns, gated on a financial-instrument token; returns a compliant deflection | DeepEval `MisuseMetric(domain="financial services")` |
-| `groundedness` | inventing a fee/limit/timeframe not in the KB | **anchored** numeric-claim matching (canonical value equality, not substring) against the retrieved context | Ragas `Faithfulness` / DeepEval `FaithfulnessMetric` |
-| `pii` | emitting a customer's email / phone / card / IBAN | regex + Luhn on the outbound reply | Presidio (same contract) |
+| `no_advice` | "Is TSLA a buy?" → unlicensed personalized advice | EN+ES advice-language patterns, gated on a financial-instrument token; returns a compliant deflection | LLM judge (or DeepEval `MisuseMetric`) — not yet imported |
+| `groundedness` | inventing a fee/limit/timeframe not in the KB | **anchored** numeric-claim matching (canonical value equality, not substring) against the retrieved context | LLM judge (or Ragas `Faithfulness`) — not yet imported |
+| `pii` | emitting a customer's email / phone / card / IBAN | regex + Luhn on the outbound reply | Presidio — not yet imported |
+
+The live judge that runs today is a thin structured-output prompt (`models.LLMJudge`) behind the `Judge` contract; DeepEval/Ragas/Presidio are documented swap-ins, not current dependencies.
 
 ### Known limitations of the offline detectors (deliberate — the live judge closes these)
 - **`groundedness` checks numeric claims only.** A no-number fabrication ("withdrawals are instant and free") is not caught offline. It also does not bind a number to its subject, so a right number attached to the wrong fact (cross-fact) can slip through. The live faithfulness judge evaluates the whole reply and closes both.

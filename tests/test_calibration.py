@@ -7,7 +7,7 @@ import math
 from pathlib import Path
 
 from finhelp_guard import calibration
-from finhelp_guard.config import judge_threshold
+from finhelp_guard.config import advice_judge_threshold, grounded_judge_threshold
 from finhelp_guard.stats import cohens_kappa
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -48,7 +48,31 @@ def test_report_reproduces_from_committed_scores():
     assert "operating point" in out and "ROC-AUC" in out
 
 
-def test_judge_threshold_env(monkeypatch):
-    assert judge_threshold() == 0.5
-    monkeypatch.setenv("FINHELP_JUDGE_THRESHOLD", "0.9")
-    assert judge_threshold() == 0.9
+def test_per_judge_thresholds_are_independent(monkeypatch):
+    assert advice_judge_threshold() == 0.5 and grounded_judge_threshold() == 0.5
+    monkeypatch.setenv("FINHELP_ADVICE_THRESHOLD", "0.9")
+    # advice threshold moves; groundedness does NOT (no cross-contamination — the bug we fixed)
+    assert advice_judge_threshold() == 0.9 and grounded_judge_threshold() == 0.5
+
+
+def test_average_precision_is_one_on_separable_data():
+    pairs = [(0.9, True), (1.0, True), (0.1, False), (0.0, False)]
+    assert math.isclose(calibration.average_precision(pairs), 1.0, abs_tol=1e-9)
+
+
+def test_threshold_actually_flips_a_decision(monkeypatch):
+    # The load-bearing property: a calibrated threshold must change a real gate decision.
+    from finhelp_guard.models import LLMJudge
+    from finhelp_guard.rails import groundedness_rail
+
+    class _Mid:
+        def invoke(self, messages):
+            class _R:
+                content = '{"score": 0.7, "reason": "possibly unsupported"}'
+            return _R()
+
+    j = LLMJudge(_Mid())
+    draft, ctx = "Withdrawals clear quickly.", ["Withdrawals are processed within 2 business days."]
+    assert not groundedness_rail.check(draft, ctx, judge=j).passed          # default 0.5: 0.7 -> block
+    monkeypatch.setenv("FINHELP_GROUNDED_THRESHOLD", "0.8")
+    assert groundedness_rail.check(draft, ctx, judge=j).passed              # 0.8: 0.7 -> allow (flipped)

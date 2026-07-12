@@ -138,10 +138,14 @@ def triage(ticket: Dict, retriever, model: Model, judge=None, max_steps: int = 6
         gate = run_gate(action.reply, contexts, DEFAULT_RAILS, judge=judge)
         passed = gate.passed
         route = "mark_ready" if passed else "human_review"
-        display = action.reply
-        for r in gate.results:                        # a rail may suggest a compliant repair
-            if not r.passed and r.fix_value:
-                display = r.fix_value
+        # `reply` is the surfaced field. On block it is a compliant deflection (if a rail
+        # offers one) or a withheld notice — NEVER the raw blocked draft (which lives only
+        # in the trace/audit record for the human reviewer). `sent_reply` is the only sendable.
+        if passed:
+            display = action.reply
+        else:
+            display = next((r.fix_value for r in gate.results if not r.passed and r.fix_value),
+                           f"[blocked by {gate.failed_rails}; routed to human review — draft withheld]")
         sent_reply = action.reply if passed else None  # ENFORCED: no sendable text when blocked
         trace.append({"step": step, "type": "finalize", "draft": action.reply,
                       "gate_passed": passed, "failed_rails": gate.failed_rails,

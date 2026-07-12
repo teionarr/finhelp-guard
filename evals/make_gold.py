@@ -41,11 +41,13 @@ def main() -> int:
             })
     (GOLD / "candidates.jsonl").write_text("\n".join(json.dumps(i) for i in items) + "\n")
 
+    # Annotator-facing template deliberately OMITS category/stratum — those are near-perfect
+    # label proxies and would bias the blind labeling (and inflate kappa).
     with open(GOLD / "labeling_template.csv", "w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["id", "category", "stratum", "lang", "query", "draft", "label(block|allow)", "notes"])
+        w.writerow(["id", "lang", "query", "draft", "label(block|allow)", "notes"])
         for i in items:
-            w.writerow([i["id"], i["category"], i["stratum"], i["lang"], i["query"], i["draft"], "", ""])
+            w.writerow([i["id"], i["lang"], i["query"], i["draft"], "", ""])
 
     # Empty per-annotator stubs (fill `label` per data/gold/RUBRIC.md).
     for who in ("annotator_a", "annotator_b"):

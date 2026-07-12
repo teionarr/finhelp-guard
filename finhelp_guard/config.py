@@ -1,16 +1,28 @@
-"""Runtime config for the rails.
+"""Per-rail judge thresholds (the operating points chosen by calibration).
 
-The judge threshold is the operating point chosen by calibration (evals/calibrate.py)
-against the human gold set. It defaults to 0.5 and is overridable via env so a
-calibrated value can be applied without a code change:  export FINHELP_JUDGE_THRESHOLD=0.6
+Each judge has its OWN threshold env var, because their score distributions differ —
+applying the advice judge's operating point to the groundedness judge is a category
+error that silently changes an unmeasured decision boundary (red-team finding).
+Default 0.5; override per judge after calibrating that specific judge:
+
+    export FINHELP_ADVICE_THRESHOLD=0.90       # from evals/calibrate.py --judge advice
+    export FINHELP_GROUNDED_THRESHOLD=0.70     # from evals/calibrate.py --judge grounded
 """
 from __future__ import annotations
 
 import os
 
 
-def judge_threshold(default: float = 0.5) -> float:
+def _thr(var: str) -> float:
     try:
-        return float(os.getenv("FINHELP_JUDGE_THRESHOLD", default))
+        return float(os.getenv(var, "0.5"))
     except ValueError:
-        return default
+        return 0.5
+
+
+def advice_judge_threshold() -> float:
+    return _thr("FINHELP_ADVICE_THRESHOLD")
+
+
+def grounded_judge_threshold() -> float:
+    return _thr("FINHELP_GROUNDED_THRESHOLD")

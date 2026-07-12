@@ -20,6 +20,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
+from .audit import audit_record
 from .models import LLMJudge, chat_model
 from .rails import DEFAULT_RAILS, run_gate
 from .retrieve import load_kb
@@ -63,6 +64,9 @@ def build_graph(kb_path: str | Path = ROOT / "data" / "kb_synthetic.jsonl"):
 
     def guardrail_gate(s: State) -> State:
         out = run_gate(s["draft"], s.get("contexts") or [], DEFAULT_RAILS, judge=judge)
+        audit_record({"path": "graph", "lang": s.get("lang"), "gate_passed": out.passed,
+                      "failed_rails": out.failed_rails,
+                      "route": "mark_ready" if out.passed else "human_review"})
         # If a rail offers a repair (e.g. the compliant deflection), use it.
         repaired = s["draft"]
         for r in out.results:

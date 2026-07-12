@@ -1,11 +1,13 @@
-"""Append-only JSONL audit trail — one immutable line per triage decision.
+"""Append-only, hash-chained audit trail — one line per triage decision.
 
-Regulated ops needs a defensible record of every automated decision: what account,
-which tools ran, the gate verdict, and where it routed. This also makes the
-"observability" claim a runnable, testable feature rather than a name-drop.
+Each record carries `prev_hash` + its own `hash` (sha256 over the record + the previous
+hash), so any silent edit/deletion of a past line breaks the chain and is detectable —
+tamper-evidence without external infra. The input text is hashed, not stored, to avoid
+persisting raw customer content.
 
-The input text is hashed, not stored, to avoid persisting raw customer content.
-Auditing never raises — a logging failure must not break a support request.
+Honest limits (see LIMITATIONS.md): a plain file is not OS-enforced WORM, and writes are
+fail-open (a logging error does not block the reply). A regulated deployment would ship
+the chain to append-only storage and choose fail-closed; the hook is here.
 """
 from __future__ import annotations
 
@@ -23,9 +25,32 @@ def _audit_path() -> Path:
     return Path(os.getenv("FINHELP_AUDIT_LOG", str(ROOT / "audit_log.jsonl")))
 
 
+def _last_hash(path: Path) -> str:
+    try:
+        lines = [l for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
+        return json.loads(lines[-1]).get("hash", "") if lines else ""
+    except Exception:
+        return ""
+
+
+def audit_record(record: Dict) -> Dict:
+    """Chain-append an arbitrary decision record (used by both the agent and graph paths)."""
+    path = _audit_path()
+    record = {"ts": datetime.now(timezone.utc).isoformat(), **record}
+    prev = _last_hash(path)
+    record["prev_hash"] = prev
+    body = json.dumps({k: v for k, v in record.items() if k != "hash"}, sort_keys=True)
+    record["hash"] = hashlib.sha256((prev + body).encode("utf-8")).hexdigest()
+    try:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record) + "\n")
+    except Exception:
+        pass  # fail-open: auditing must not break the request path (see LIMITATIONS.md)
+    return record
+
+
 def audit_decision(ticket: Dict, result) -> Dict:
-    record = {
-        "ts": datetime.now(timezone.utc).isoformat(),
+    return audit_record({
         "ticket_id": ticket.get("id"),
         "account_id": ticket.get("account_id"),
         "lang": ticket.get("lang"),
@@ -36,10 +61,4 @@ def audit_decision(ticket: Dict, result) -> Dict:
         "route": result.route,
         "sent": result.sent,
         "model": os.getenv("NEBIUS_MODEL") or os.getenv("OPENAI_MODEL") or "scripted",
-    }
-    try:
-        with open(_audit_path(), "a", encoding="utf-8") as f:
-            f.write(json.dumps(record) + "\n")
-    except Exception:
-        pass  # auditing must never break the request path
-    return record
+    })

@@ -7,7 +7,7 @@
   },
   "result": {
     "ticket_id": "T-1",
-    "reply": "Your withdrawal fee is $5 per transaction, and standard withdrawals are processed within 2 business days. You can withdraw amounts starting from $30. Your account is verified and eligible for withdrawal.",
+    "reply": "The withdrawal fee is $5 and withdrawals are processed within 2 business days.",
     "route": "mark_ready",
     "gate_passed": true,
     "failed_rails": [],
@@ -36,7 +36,7 @@
         "type": "tool_call",
         "name": "search_kb",
         "args": {
-          "query": "withdrawal fee and processing time policy AC-1001"
+          "query": "withdrawal fee and time"
         },
         "result": [
           "Withdrawals: the minimum withdrawal amount is $30. Standard withdrawals are processed within 2 business days. A flat $5 withdrawal fee applies to each withdrawal.",
@@ -46,15 +46,15 @@
       {
         "step": 2,
         "type": "finalize",
-        "draft": "Your withdrawal fee is $5 per transaction, and standard withdrawals are processed within 2 business days. You can withdraw amounts starting from $30. Your account is verified and eligible for withdrawal.",
+        "draft": "The withdrawal fee is $5 and withdrawals are processed within 2 business days.",
         "gate_passed": true,
         "failed_rails": [],
         "route": "mark_ready",
         "sent": true,
-        "sent_reply": "Your withdrawal fee is $5 per transaction, and standard withdrawals are processed within 2 business days. You can withdraw amounts starting from $30. Your account is verified and eligible for withdrawal."
+        "sent_reply": "The withdrawal fee is $5 and withdrawals are processed within 2 business days."
       }
     ],
     "sent": true,
-    "sent_reply": "Your withdrawal fee is $5 per transaction, and standard withdrawals are processed within 2 business days. You can withdraw amounts starting from $30. Your account is verified and eligible for withdrawal."
+    "sent_reply": "The withdrawal fee is $5 and withdrawals are processed within 2 business days."
   }
 }

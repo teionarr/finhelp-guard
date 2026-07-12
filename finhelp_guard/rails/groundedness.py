@@ -23,7 +23,7 @@ from __future__ import annotations
 import re
 from typing import List, Optional, Set, Tuple
 
-from ..config import judge_threshold
+from ..config import grounded_judge_threshold
 from .base import Judge, Rail, RailResult
 
 Claim = Tuple[str, ...]  # a typed, canonical claim, e.g. ("money","USD",5.0) or ("time",2.0,"day")
@@ -91,7 +91,7 @@ def _detector(draft: str, contexts: List[str], judge: Optional[Judge]) -> RailRe
             "that is NOT supported by the provided context?",
             draft, contexts,
         )
-        return (RailResult("groundedness", False, f"judge: {why}") if score >= judge_threshold()
+        return (RailResult("groundedness", False, f"judge: {why}") if score >= grounded_judge_threshold()
                 else RailResult("groundedness", True, "judge: no unsupported claim"))
 
     return RailResult("groundedness", True, "no concrete numeric claim to verify (offline)")

@@ -83,3 +83,19 @@ def test_audit_log_is_appended(tmp_path, monkeypatch):
     lines = log.read_text().strip().splitlines()
     rec = json.loads(lines[-1])
     assert rec["ticket_id"] == "AUD" and "input_sha256" in rec and "route" in rec
+
+
+def test_audit_is_hash_chained(tmp_path, monkeypatch):
+    monkeypatch.setenv("FINHELP_AUDIT_LOG", str(tmp_path / "a.jsonl"))
+    from finhelp_guard.audit import audit_record
+    r1 = audit_record({"x": 1})
+    r2 = audit_record({"x": 2})
+    assert r1["hash"] and r2["prev_hash"] == r1["hash"] and r2["hash"] != r1["hash"]
+
+
+def test_blocked_reply_field_is_not_the_raw_draft(tmp_path, monkeypatch):
+    monkeypatch.setenv("FINHELP_AUDIT_LOG", str(tmp_path / "a.jsonl"))
+    # A PII draft (no fix_value) must not surface the raw draft in `reply`.
+    t = {"id": "PII", "account_id": "AC-1001", "lang": "en", "text": "x"}
+    res = triage(t, KB, ScriptedModel({"PII": [Finalize("Reach me at leak@example.com")]}))
+    assert res.sent_reply is None and "leak@example.com" not in res.reply

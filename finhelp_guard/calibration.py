@@ -44,8 +44,22 @@ def roc_points(pairs: List[Pair]) -> List[Tuple[float, float]]:
     return sorted((_rates(pairs, t)[1], _rates(pairs, t)[0]) for t in _thresholds(pairs))
 
 
-def pr_points(pairs: List[Pair]) -> List[Tuple[float, float]]:
-    return sorted((_rates(pairs, t)[0], _rates(pairs, t)[2]) for t in _thresholds(pairs))
+def average_precision(pairs: List[Pair]) -> float:
+    """Average precision (area under PR), computed in descending-score order — the
+    correct PR-AUC. (Sorting (recall, precision) points and trapezoiding is wrong and
+    under-reports on separable data.)"""
+    positives = sum(1 for _, y in pairs if y)
+    if positives == 0:
+        return float("nan")
+    tp = fp = 0
+    ap = 0.0
+    for _, y in sorted(pairs, key=lambda p: p[0], reverse=True):
+        if y:
+            tp += 1
+            ap += tp / (tp + fp)          # precision at each true positive
+        else:
+            fp += 1
+    return ap / positives
 
 
 def auc(points: List[Tuple[float, float]]) -> float:
@@ -91,12 +105,14 @@ def pick_operating_point(pairs: List[Pair], max_false_refusal: float) -> Optiona
     """Max recall subject to false_refusal <= ceiling (lower threshold => more recall
     and more false-refusal, so take the smallest threshold that still satisfies the ceiling)."""
     feasible = [op for op in sweep(pairs) if op.false_refusal <= max_false_refusal]
-    return max(feasible, key=lambda op: (op.recall, -op.threshold)) if feasible else None
+    # At equal recall, prefer the HIGHER threshold (fewer false refusals) — a safety default.
+    return max(feasible, key=lambda op: (op.recall, op.threshold)) if feasible else None
 
 
-def report(pairs: List[Pair], max_false_refusal: float = 0.10) -> str:
+def report(pairs: List[Pair], max_false_refusal: float = 0.10,
+           env_var: str = "FINHELP_ADVICE_THRESHOLD") -> str:
     roc_auc = auc(roc_points(pairs))
-    pr_auc = auc(pr_points(pairs))
+    pr_auc = average_precision(pairs)
     op = pick_operating_point(pairs, max_false_refusal)
     lines = [
         f"n={len(pairs)}  positives={sum(1 for _, y in pairs if y)}  "
@@ -110,7 +126,7 @@ def report(pairs: List[Pair], max_false_refusal: float = 0.10) -> str:
         lines.append(f"\n  -> operating point (max recall s.t. false_refusal<={max_false_refusal:.2f}): "
                      f"threshold={op.threshold:.2f}  recall={op.recall:.3f}  "
                      f"false_refusal={op.false_refusal:.3f}  precision={op.precision:.3f}")
-        lines.append(f"     apply with:  export FINHELP_JUDGE_THRESHOLD={op.threshold:.2f}")
+        lines.append(f"     apply with:  export {env_var}={op.threshold:.2f}")
     else:
         lines.append(f"\n  -> no threshold satisfies false_refusal<={max_false_refusal:.2f} on this data")
     return "\n".join(lines)
