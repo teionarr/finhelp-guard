@@ -2,6 +2,17 @@
 
 This is a pre-1.0 project; the API may change. Breaking changes are flagged.
 
+## [Unreleased]
+
+### Added
+- **Pluggable retrieval** behind the existing `retrieve(query, k, lang)` contract:
+  `BM25Retriever` (default), `DenseRetriever` (embeddings + cosine), and `HybridRetriever`
+  fusing both via **Reciprocal Rank Fusion**. Selected by `FINHELP_RETRIEVER=bm25|dense|hybrid`.
+  Embedder backings: provider (Azure/OpenAI/Nebius, `models.embedding_model()`),
+  `sentence-transformers` (integration lane), and a deterministic keyless `HashingEmbedder`.
+  Default stays `bm25` — eval numbers and the CI gate are unchanged. RRF fusion is unit-tested
+  against a hand computation (`tests/test_retrieve.py`). See ADR 0004.
+
 ## [0.1.0]
 
 Support-ops guardrail + eval harness with a tool-calling triage agent, verified against a

@@ -3,3 +3,4 @@
 # fast unit lane on purpose.
 -r requirements-dev.txt
 guardrails-ai==0.6.8   # pinned to the verified API (the adapter also tolerates newer .use signatures)
+sentence-transformers>=2.2   # real local embeddings for the dense/hybrid retrieval path

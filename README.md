@@ -31,6 +31,7 @@ Shipping an LLM into a regulated support workflow fails on two fronts that demos
 - **Three guardrail rails** — `no_advice`, `groundedness`, `pii` — behind one simple `(draft, contexts) -> RailResult` contract.
 - **An enforcing gate** — a blocked reply is *physically unsendable*, routed to a human; nothing is advisory.
 - **A working tool-calling agent** (`--triage`) with a mocked CRM, so there's a real system-under-test; runs end-to-end in CI with 0 keys.
+- **Pluggable retrieval** — lexical **BM25**, **dense embeddings**, or **hybrid (RRF fusion)** behind one `retrieve()` contract; the embedder is an interface, so a production vector store (pgvector / Azure AI Search) drops in with no caller change.
 - **A statistically-honest eval** — confidence-interval gating (Wilson), per-rail + gate-level precision/recall, McNemar regression test, dev/held-out split.
 - **Judge calibration** — ROC / PR-AUC / ECE + per-judge operating points, plus a Cohen's-κ gold-set workflow.
 - **Authorization, budgets, and a hash-chained audit log** for regulated ops.
@@ -111,6 +112,17 @@ Authorization is enforced inside the tools; the gate is enforcing (not advisory)
 
 The live judge today is a thin structured-output prompt (`models.LLMJudge`); DeepEval/Ragas/Presidio are **documented swap-ins behind the same contracts, not current dependencies**. Deliberate offline limits (no-number & cross-fact groundedness, paraphrase/other-language advice, obfuscated PII) are what the live judge / Presidio close — see [LIMITATIONS.md](LIMITATIONS.md).
 
+### Retrieval (pluggable: lexical · dense · hybrid)
+RAG retrieval is a swappable component behind `retrieve(query, k, lang) -> list[str]`:
+
+| Mode (`FINHELP_RETRIEVER`) | What it does | Embedding backing |
+|---|---|---|
+| `bm25` (default) | Okapi BM25 lexical — exact-term recall, zero deps, deterministic (keeps CI keyless) | — |
+| `dense` | Embeddings + cosine — semantic recall | provider / `sentence-transformers` / hashing |
+| `hybrid` | Fuses BM25 + dense with **Reciprocal Rank Fusion** (RRF) — exact *and* semantic | same as `dense` |
+
+The dense side is an `Embedder` interface with three backings: a **provider** endpoint (Azure/OpenAI/Nebius) for live, **`sentence-transformers`** for the integration lane, and a deterministic dependency-free **`HashingEmbedder`** so the dense/fusion *code path* runs keyless in CI. The hashing stand-in is **not semantic** (it can't match synonyms) and is used only to exercise mechanics — real semantic recall is demonstrated in the integration/live lane, and the RRF fusion is unit-tested against a hand computation (`tests/test_retrieve.py`). This is the seam where a full vector-store RAG plugs in: implement `Embedder`, no other code changes.
+
 ### One definition, three runtimes
 The rail logic is written once and runs (1) as the dependency-free **offline gate** (CI), (2) inside a real **Guardrails AI `Guard()`** (`guardrails_adapter.py`, integration lane), and (3) behind an **LLM judge**. You pick the stack; the rules stay identical.
 
@@ -147,6 +159,8 @@ Operational knobs (rollback / feature-flags) — see [CONTRIBUTING.md](CONTRIBUT
 | Env var | Effect |
 |---|---|
 | `FINHELP_DISABLE_RAILS=pii` | Hot-disable a rail without a deploy (`active_rails()`) |
+| `FINHELP_RETRIEVER` | Retrieval mode: `bm25` (default) · `dense` · `hybrid` (RRF fusion) |
+| `FINHELP_EMBEDDER` | Force dense backing: `provider` · `sentence-transformers` · `hashing` (else auto) |
 | `FINHELP_ADVICE_THRESHOLD` / `FINHELP_GROUNDED_THRESHOLD` | Per-judge operating points from calibration |
 | `FINHELP_LLM_TIMEOUT` | Per-call model timeout (seconds) |
 | `FINHELP_AUDIT_LOG` | Audit-log path |
