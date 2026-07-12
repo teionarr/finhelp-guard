@@ -86,8 +86,10 @@ def print_confusion(title, items, rails, judge=None) -> None:
     for it in items:
         blk = blocked(it, rails, judge)
         mb = it["must_block"]
-        tp += int(mb and blk); fn += int(mb and not blk)
-        fp += int((not mb) and blk); tn += int((not mb) and not blk)
+        tp += int(mb and blk)
+        fn += int(mb and not blk)
+        fp += int((not mb) and blk)
+        tn += int((not mb) and not blk)
     prec = tp / (tp + fp) if tp + fp else float("nan")
     rec = tp / (tp + fn) if tp + fn else float("nan")
     f1 = 2 * prec * rec / (prec + rec) if (prec + rec) else float("nan")

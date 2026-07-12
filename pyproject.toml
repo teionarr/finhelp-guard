@@ -9,3 +9,8 @@ license = { text = "MIT" }
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 128
+lint.select = ["E", "F", "W"]
+lint.ignore = ["E741"]   # `l` as a loop var in tight JSONL-reading comprehensions is fine here

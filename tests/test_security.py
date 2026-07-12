@@ -4,7 +4,7 @@ from pathlib import Path
 
 from finhelp_guard.agent import (Escalate, Finalize, LLMModel, ScriptedModel, ToolCall,
                                  _run_tool, triage)
-from finhelp_guard.rails import pii_rail, run_gate, DEFAULT_RAILS
+from finhelp_guard.rails import pii_rail
 from finhelp_guard.retrieve import load_kb
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -62,7 +62,6 @@ def test_unparseable_output_escalates(tmp_path, monkeypatch):
 
 
 def test_json_extraction_handles_code_fences():
-    m = LLMModel(model=_Garbage())
     from finhelp_guard.agent import _extract_json
     assert _extract_json('```json\n{"final": "ok"}\n```') == {"final": "ok"}
 

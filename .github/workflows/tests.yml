@@ -20,6 +20,8 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements-dev.txt
+      - name: lint (ruff)
+        run: ruff check finhelp_guard evals tests
       - name: unit tests (integration test auto-skips without guardrails)
         run: pytest -q
       - name: eval gate (dev must be GREEN)

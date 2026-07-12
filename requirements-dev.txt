@@ -1,4 +1,5 @@
 # Enough to run the offline demo, eval gate, and tests (the fast, keyless unit lane).
 pytest>=8.0
+ruff>=0.6            # lint (CI gate)
 rank_bm25>=0.2       # real BM25 retriever (composed, not hand-rolled)
 statsmodels>=0.14    # enables the stats cross-check test (Wilson/McNemar vs a reference lib)
