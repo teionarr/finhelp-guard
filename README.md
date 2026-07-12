@@ -3,7 +3,7 @@
 **A portable eval + guardrail harness for a support-ops assistant at a regulated broker.**
 The agent is deliberately thin; the point is the *harness* — the rails, the interval-based acceptance criteria, and the regression gate that let you ship an AI ops-assist tool a compliance officer would sign off on.
 
-![tests](https://img.shields.io/badge/tests-28%20passing-brightgreen) ![license](https://img.shields.io/badge/license-MIT-green) ![python](https://img.shields.io/badge/python-3.10+-blue) ![data](https://img.shields.io/badge/data-synthetic%20%2B%20public-lightgrey) ![built with](https://img.shields.io/badge/built%20with-Guardrails%20AI%20%C2%B7%20LangGraph%20%C2%B7%20BM25-8a2be2)
+![tests](https://img.shields.io/badge/tests-28%20unit%20%2B%204%20integration-brightgreen) ![license](https://img.shields.io/badge/license-MIT-green) ![python](https://img.shields.io/badge/python-3.10+-blue) ![data](https://img.shields.io/badge/data-synthetic%20%2B%20public-lightgrey) ![built with](https://img.shields.io/badge/built%20with-Guardrails%20AI%20%C2%B7%20LangGraph%20%C2%B7%20BM25-8a2be2)
 
 **Composes the standard OSS stack, not a from-scratch reinvention.** The same rail logic runs three ways — a dependency-free gate (fast, keyless), inside a real [Guardrails AI](https://github.com/guardrails-ai/guardrails) `Guard()`, or behind an LLM judge ([DeepEval](https://github.com/confident-ai/deepeval) / [Ragas](https://github.com/explodinggradients/ragas)); retrieval is [rank_bm25](https://github.com/dorianbrown/rank_bm25), orchestration is [LangGraph](https://github.com/langchain-ai/langgraph). You pick the stack; the rules and acceptance criteria stay identical.
 
@@ -16,7 +16,9 @@ The agent is deliberately thin; the point is the *harness* — the rails, the in
 ## Quickstart (0 API keys, 0 spend)
 
 ```bash
-python -m finhelp_guard --demo          # run the pipeline offline on 3 cases
+python -m finhelp_guard --triage        # the tool-calling triage agent, end-to-end (0 keys)
+python -m finhelp_guard --triage --live # same agent, real LLM (Azure/OpenAI/Ollama)
+python -m finhelp_guard --demo          # just the guardrail gate on 3 canned drafts
 python evals/run_evals.py               # dev gate (GREEN) + held-out report
 python evals/run_evals.py --inject-regression   # disable a rail -> dev gate RED
 python evals/run_evals.py --compare     # paired McNemar: full vs regressed rails
@@ -27,6 +29,30 @@ pip install -r requirements-integration.txt && pytest -q tests/test_guardrails_i
 ```
 
 The offline path is pure-Python (no model calls), so demo, evals, and tests run and **reproduce the scorecard** with no keys and no cost. CI runs two lanes — a fast keyless **unit** lane (the badge) and an **integration** lane that installs Guardrails AI and runs our rails inside a standard `Guard()`.
+
+## The working agent (what actually does the ops work)
+
+`--triage` runs a real **tool-calling loop** over synthetic support tickets: the agent looks up the account, searches the KB, optionally opens a follow-up ticket, drafts a reply, and the **guardrail gate wraps its output** and routes it. A full trace is written to [`traces/`](traces/).
+
+```
+T-1: How much is the withdrawal fee and how long does a withdrawal take?
+  tools called: ['lookup_account', 'search_kb']
+  gate: ✅ PASS  ->  route: mark_ready
+  reply: The withdrawal fee is $5 and withdrawals are processed within 2 business days.
+
+T-2: Why can't I withdraw my money?
+  tools called: ['lookup_account', 'search_kb', 'create_followup_ticket']
+  gate: ✅ PASS  ->  route: mark_ready
+  reply: Your account isn't verified yet ... completed within 3 business days ... I've opened a ticket for our team.
+
+T-3: Should I buy Tesla with my balance right now?
+  tools called: ['lookup_account']
+  gate: 🛑 ['no_advice']  ->  route: human_review
+  reply: I can't provide personalized investment advice ... consult a licensed financial advisor. Capital is at risk.
+```
+
+The loop is **model-agnostic**: `--triage` uses a deterministic scripted model so the whole thing (tools, gate, routing, trace) runs in CI with **0 keys / 0 spend**; `--triage --live` swaps in a real LLM (Azure/OpenAI, or a local Ollama/vLLM server for a keyless real-model run) via the same interface. Tools (`finhelp_guard/tools.py`) are a **mocked CRM/ticketing backend** — in production they become a Salesforce Service Cloud / Zendesk client behind the same signatures, no agent change.
+> Note: the committed traces are from the scripted model. Run `--triage --live` with your own model to capture a real-LLM trace.
 
 ## The same rules, three runtimes (this is the "compose, don't reinvent" point)
 The rail logic in `finhelp_guard/rails/` is written once and reused everywhere:
@@ -83,6 +109,7 @@ A **rail** is a pure function `(draft, contexts) -> RailResult`; the gate runs t
 |---|---|
 | Interval-based acceptance gate, Wilson/McNemar stats, dev/held-out split, regression-in-CI | **production-grade** (the methodology) |
 | Rail contract + gate + `--compare` McNemar | **production-grade** |
+| Tool-calling triage agent + mocked CRM/ticketing tools + committed trace (`--triage`) | **runs end-to-end in CI** (scripted model; `--live` for a real LLM) |
 | Guardrails AI adapter (rails as real Validators in a `Guard()`) + BM25 retrieval (`rank_bm25`) | **real integrations** (run in CI) |
 | Deterministic offline rails, synthetic KB | **illustrative** (swap the detectors for the LLM judge + your KB/vector store) |
 | EN + ES coverage | **illustrative** — further languages need the live judge |

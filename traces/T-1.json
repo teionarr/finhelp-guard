@@ -1,0 +1,57 @@
+{
+  "ticket": {
+    "id": "T-1",
+    "account_id": "AC-1001",
+    "lang": "en",
+    "text": "How much is the withdrawal fee and how long does a withdrawal take?"
+  },
+  "result": {
+    "ticket_id": "T-1",
+    "reply": "The withdrawal fee is $5 and withdrawals are processed within 2 business days.",
+    "route": "mark_ready",
+    "gate_passed": true,
+    "failed_rails": [],
+    "tools_used": [
+      "lookup_account",
+      "search_kb"
+    ],
+    "trace": [
+      {
+        "step": 0,
+        "type": "tool_call",
+        "name": "lookup_account",
+        "args": {
+          "account_id": "AC-1001"
+        },
+        "result": {
+          "id": "AC-1001",
+          "name": "Jordan Lee",
+          "verified": true,
+          "can_withdraw": true,
+          "balance_usd": 240.0
+        }
+      },
+      {
+        "step": 1,
+        "type": "tool_call",
+        "name": "search_kb",
+        "args": {
+          "query": "withdrawal fee and time"
+        },
+        "result": [
+          "Withdrawals: the minimum withdrawal amount is $30. Standard withdrawals are processed within 2 business days. A flat $5 withdrawal fee applies to each withdrawal.",
+          "Inactivity: accounts with no login for 12 months are charged a $10 monthly inactivity fee. Logging in at any time stops the fee."
+        ]
+      },
+      {
+        "step": 2,
+        "type": "finalize",
+        "draft": "The withdrawal fee is $5 and withdrawals are processed within 2 business days.",
+        "gate_passed": true,
+        "failed_rails": [],
+        "route": "mark_ready",
+        "sent_reply": "The withdrawal fee is $5 and withdrawals are processed within 2 business days."
+      }
+    ]
+  }
+}

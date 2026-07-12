@@ -5,7 +5,7 @@ as genuine `guardrails` Validators, so in a Guardrails-AI shop these plug into a
 standard `Guard()` (and could be published to the Guardrails Hub) with no rewrite.
 
 This module imports `guardrails`, so it is optional — the core offline path never
-touches it. Install with `pip install -r requirements-live.txt`.
+touches it. Install with `pip install -r requirements-integration.txt`.
 
     from finhelp_guard.guardrails_adapter import build_guard
     guard = build_guard()

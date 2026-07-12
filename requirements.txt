@@ -1,6 +1,7 @@
 # Live pipeline (the offline demo/evals/tests need NONE of these).
 # Pin loosely; these are the swap-in points for the illustrative offline stubs.
-guardrails-ai>=0.6         # real guardrails framework — see finhelp_guard/guardrails_adapter.py
+guardrails-ai>=0.6.8       # real guardrails framework — see finhelp_guard/guardrails_adapter.py
+                           # (the integration CI lane pins ==0.6.8 for reproducibility)
 langgraph>=1.0             # agent orchestration (finhelp_guard/graph.py)
 langchain>=0.3
 langchain-openai>=0.2      # AzureChatOpenAI / ChatOpenAI
