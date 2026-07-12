@@ -2,7 +2,7 @@
 
 This is a pre-1.0 project; the API may change. Breaking changes are flagged.
 
-## [Unreleased]
+## [0.2.0]
 
 ### Added
 - **Pluggable retrieval** behind the existing `retrieve(query, k, lang)` contract:
@@ -11,7 +11,8 @@ This is a pre-1.0 project; the API may change. Breaking changes are flagged.
   Embedder backings: provider (Azure/OpenAI/Nebius, `models.embedding_model()`),
   `sentence-transformers` (integration lane), and a deterministic keyless `HashingEmbedder`.
   Default stays `bm25` — eval numbers and the CI gate are unchanged. RRF fusion is unit-tested
-  against a hand computation (`tests/test_retrieve.py`). See ADR 0004.
+  against a hand computation (`tests/test_retrieve.py`); real semantic recall (dense catches a
+  paraphrase BM25 misses) is verified with `sentence-transformers` in the integration lane. See ADR 0004.
 
 ## [0.1.0]
 
