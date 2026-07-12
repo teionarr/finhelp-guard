@@ -1,12 +1,13 @@
-# Live pipeline (the offline demo/evals/tests need NONE of these).
-# Pin loosely; these are the swap-in points for the illustrative offline stubs.
+# Live pipeline (the offline demo/evals/tests need NONE of these — they are keyless).
+# These are the packages actually imported by the live path:
 guardrails-ai>=0.6.8       # real guardrails framework — see finhelp_guard/guardrails_adapter.py
                            # (the integration CI lane pins ==0.6.8 for reproducibility)
 langgraph>=1.0             # agent orchestration (finhelp_guard/graph.py)
 langchain>=0.3
-langchain-openai>=0.2      # AzureChatOpenAI / ChatOpenAI
-ragas>=0.2                 # swap-in target for the groundedness judge (NOT yet imported)
-deepeval>=1.0              # swap-in target for the advice/faithfulness judge (NOT yet imported)
-statsmodels>=0.14          # cross-check for the pure-Python stats
-langfuse>=3.0              # tracing (optional)
-# presidio-analyzer / presidio-anonymizer  # PII rail (stretch; needs a spaCy model)
+langchain-openai>=0.2      # AzureChatOpenAI / ChatOpenAI / Nebius (finhelp_guard/models.py)
+
+# Documented swap-ins behind the Judge/rail contracts — NOT imported yet, so not pinned
+# here (listing them as deps would overstate what the code uses):
+#   ragas / deepeval            -> live groundedness / advice judges (LLMJudge is the current impl)
+#   langfuse                    -> tracing (the audit log is the current observability)
+#   presidio-analyzer/anonymizer -> PII rail (needs a spaCy model)

@@ -18,12 +18,13 @@ Tier-1 safety properties enforced here (see the red-team findings in docs/):
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Protocol, Union
 
 from . import tools as T
 from .audit import audit_decision
-from .rails import DEFAULT_RAILS, run_gate
+from .rails import active_rails, run_gate
 
 MAX_TICKET_CHARS = 4000
 MAX_HISTORY_STEPS = 8
@@ -63,6 +64,8 @@ class TriageResult:
     trace: List[Dict]
     sent: bool = False            # true only when the reply may actually be sent
     sent_reply: Optional[str] = None  # the ONLY sendable text; None when blocked
+    latency_ms: float = 0.0
+    steps: int = 0
 
     def summary(self) -> str:
         return (f"[{self.ticket_id}] tools={self.tools_used} "
@@ -99,6 +102,7 @@ def _run_tool(call: ToolCall, retriever, ticket: Dict) -> Any:
 
 def triage(ticket: Dict, retriever, model: Model, judge=None, max_steps: int = 6) -> TriageResult:
     ticket = {**ticket, "text": str(ticket.get("text", ""))[:MAX_TICKET_CHARS]}  # input cap
+    t0 = time.perf_counter()
     history: List[Dict] = []
     trace: List[Dict] = []
     contexts: List[str] = []
@@ -106,7 +110,9 @@ def triage(ticket: Dict, retriever, model: Model, judge=None, max_steps: int = 6
     seen_calls: set = set()
 
     def finish(res: TriageResult) -> TriageResult:
-        audit_decision(ticket, res)   # append-only audit log for every decision
+        res.latency_ms = round((time.perf_counter() - t0) * 1000, 1)
+        res.steps = sum(1 for s in res.trace if s.get("type") == "tool_call")
+        audit_decision(ticket, res)   # append-only, hash-chained audit log for every decision
         return res
 
     for step in range(max_steps):
@@ -135,7 +141,7 @@ def triage(ticket: Dict, retriever, model: Model, judge=None, max_steps: int = 6
             continue
 
         # Finalize -> run the guardrail gate over the draft + everything retrieved.
-        gate = run_gate(action.reply, contexts, DEFAULT_RAILS, judge=judge)
+        gate = run_gate(action.reply, contexts, active_rails(), judge=judge)
         passed = gate.passed
         route = "mark_ready" if passed else "human_review"
         # `reply` is the surfaced field. On block it is a compliant deflection (if a rail

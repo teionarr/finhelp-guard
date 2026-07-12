@@ -3,9 +3,9 @@
 **A portable eval + guardrail harness for a support-ops assistant at a regulated broker.**
 The agent is deliberately thin; the point is the *harness* — the rails, the interval-based acceptance criteria, and the regression gate that let you ship an AI ops-assist tool a compliance officer would sign off on.
 
-![tests](https://img.shields.io/badge/tests-47%20unit%20%2B%204%20integration-brightgreen) ![license](https://img.shields.io/badge/license-MIT-green) ![python](https://img.shields.io/badge/python-3.10+-blue) ![data](https://img.shields.io/badge/data-synthetic%20%2B%20public-lightgrey) ![built with](https://img.shields.io/badge/built%20with-Guardrails%20AI%20%C2%B7%20LangGraph%20%C2%B7%20BM25-8a2be2)
+![tests](https://img.shields.io/badge/tests-48%20unit%20%2B%204%20integration-brightgreen) ![license](https://img.shields.io/badge/license-MIT-green) ![python](https://img.shields.io/badge/python-3.10+-blue) ![data](https://img.shields.io/badge/data-synthetic%20%2B%20public-lightgrey) ![built with](https://img.shields.io/badge/built%20with-Guardrails%20AI%20%C2%B7%20LangGraph%20%C2%B7%20BM25-8a2be2)
 
-**Composes the standard OSS stack, not a from-scratch reinvention.** The same rail logic runs three ways — a dependency-free gate (fast, keyless), inside a real [Guardrails AI](https://github.com/guardrails-ai/guardrails) `Guard()`, or behind an LLM judge ([DeepEval](https://github.com/confident-ai/deepeval) / [Ragas](https://github.com/explodinggradients/ragas)); retrieval is [rank_bm25](https://github.com/dorianbrown/rank_bm25), orchestration is [LangGraph](https://github.com/langchain-ai/langgraph). You pick the stack; the rules and acceptance criteria stay identical.
+**Composes the standard OSS stack, not a from-scratch reinvention.** The same rail logic runs three ways — a dependency-free gate (fast, keyless), inside a real [Guardrails AI](https://github.com/guardrails-ai/guardrails) `Guard()`, or behind an LLM judge (a thin `LLMJudge` today; [DeepEval](https://github.com/confident-ai/deepeval) / [Ragas](https://github.com/explodinggradients/ragas) are documented swap-ins); retrieval is [rank_bm25](https://github.com/dorianbrown/rank_bm25), orchestration is [LangGraph](https://github.com/langchain-ai/langgraph). You pick the stack; the rules and acceptance criteria stay identical.
 
 > ⚠️ **Illustrative system-under-test — read this first (Portability & Scope).**
 > This is a **methodology demonstrated on a throwaway agent**, *not* a proposed production stack and *not* affiliated with any broker. In a real environment the system-under-test is your existing support stack (e.g. Salesforce Service Cloud + Einstein, or an in-house LLM) — what ports is the **harness**: the guardrail rails, the acceptance criteria, the statistics, and the CI gate, all stack-agnostic. I built a small LangGraph agent only so there'd be something to evaluate.
@@ -22,7 +22,7 @@ python -m finhelp_guard --demo          # just the guardrail gate on 3 canned dr
 python evals/run_evals.py               # dev gate (GREEN) + held-out report
 python evals/run_evals.py --inject-regression   # disable a rail -> dev gate RED
 python evals/run_evals.py --compare     # paired McNemar: full vs regressed rails
-pip install -r requirements-dev.txt && pytest -q   # 47 unit tests (keyless)
+pip install -r requirements-dev.txt && pytest -q   # 48 unit tests (keyless)
 python evals/calibrate.py                          # judge threshold sweep + ROC/PR/AUC/ECE (keyless)
 
 # run the same rails inside the real Guardrails AI framework:
@@ -60,7 +60,7 @@ The loop is **model-agnostic**: `--triage` uses a deterministic scripted model s
 The rail logic in `finhelp_guard/rails/` is written once and reused everywhere:
 1. **Offline gate** (`rails.run_gate`) — deterministic, zero deps, gates CI.
 2. **Guardrails AI** (`guardrails_adapter.py`) — the *same* rails registered as real `guardrails` Validators in a `Guard()`; drop-in for a Guardrails-AI shop, publishable to the Hub.
-3. **LLM-judge** — inject a judge (DeepEval `MisuseMetric` / Ragas `Faithfulness`) via the same `Judge` contract for the paraphrase/no-digit cases the deterministic rails can't catch.
+3. **LLM-judge** — inject a judge (the current thin `LLMJudge`; DeepEval `MisuseMetric` / Ragas `Faithfulness` are drop-in swap-ins) via the same `Judge` contract for the paraphrase/no-digit cases the deterministic rails can't catch.
 One definition of "what's allowed," three ways to enforce it. That is the operations-tooling skill: complex ecosystem underneath, one simple contract on top.
 
 ## Safety & security — enforced, not advisory

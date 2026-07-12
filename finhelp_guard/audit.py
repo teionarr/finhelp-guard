@@ -60,5 +60,7 @@ def audit_decision(ticket: Dict, result) -> Dict:
         "failed_rails": list(result.failed_rails),
         "route": result.route,
         "sent": result.sent,
+        "latency_ms": getattr(result, "latency_ms", 0.0),
+        "steps": getattr(result, "steps", 0),
         "model": os.getenv("NEBIUS_MODEL") or os.getenv("OPENAI_MODEL") or "scripted",
     })

@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 
 from .audit import audit_record
 from .models import LLMJudge, chat_model
-from .rails import DEFAULT_RAILS, run_gate
+from .rails import active_rails, run_gate
 from .retrieve import load_kb
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -63,7 +63,7 @@ def build_graph(kb_path: str | Path = ROOT / "data" / "kb_synthetic.jsonl"):
         return {"draft": d.answer}
 
     def guardrail_gate(s: State) -> State:
-        out = run_gate(s["draft"], s.get("contexts") or [], DEFAULT_RAILS, judge=judge)
+        out = run_gate(s["draft"], s.get("contexts") or [], active_rails(), judge=judge)
         audit_record({"path": "graph", "lang": s.get("lang"), "gate_passed": out.passed,
                       "failed_rails": out.failed_rails,
                       "route": "mark_ready" if out.passed else "human_review"})

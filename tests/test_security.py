@@ -84,6 +84,14 @@ def test_audit_log_is_appended(tmp_path, monkeypatch):
     assert rec["ticket_id"] == "AUD" and "input_sha256" in rec and "route" in rec
 
 
+def test_rail_can_be_disabled_via_flag(monkeypatch):
+    from finhelp_guard.rails import DEFAULT_RAILS, active_rails
+    assert len(active_rails()) == len(DEFAULT_RAILS)
+    monkeypatch.setenv("FINHELP_DISABLE_RAILS", "pii")
+    names = [r.name for r in active_rails()]
+    assert "pii" not in names and "no_advice" in names
+
+
 def test_audit_is_hash_chained(tmp_path, monkeypatch):
     monkeypatch.setenv("FINHELP_AUDIT_LOG", str(tmp_path / "a.jsonl"))
     from finhelp_guard.audit import audit_record

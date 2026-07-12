@@ -21,12 +21,12 @@ Empty retrieved context -> insufficient evidence -> block (never auto-"grounded"
 from __future__ import annotations
 
 import re
-from typing import List, Optional, Set, Tuple
+from typing import Any, List, Optional, Set, Tuple
 
 from ..config import grounded_judge_threshold
 from .base import Judge, Rail, RailResult
 
-Claim = Tuple[str, ...]  # a typed, canonical claim, e.g. ("money","USD",5.0) or ("time",2.0,"day")
+Claim = Tuple[Any, ...]  # a typed, canonical claim, e.g. ("money","USD",5.0) or ("time",2.0,"day")
 
 _CURRENCY = {"$": "USD", "€": "EUR", "£": "GBP", "usd": "USD", "eur": "EUR", "gbp": "GBP"}
 _UNIT = {
