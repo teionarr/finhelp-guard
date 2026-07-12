@@ -1,0 +1,27 @@
+support-guard — third-party notices
+===================================
+
+Code: MIT (see LICENSE).
+
+Committed data (data/*.jsonl): self-authored SYNTHETIC examples created for this
+demo. No third-party dataset is redistributed in this repository. All names,
+fees, and figures are fictional and illustrative.
+
+Optional datasets pulled at RUNTIME by the live pipeline (not committed here):
+
+- MASSIVE — AmazonScience/massive — License: CC BY 4.0.
+  Attribution: FitzGerald et al., "MASSIVE" (Amazon, 2022). Modifications: used
+  for intent/triage evaluation only. https://huggingface.co/datasets/AmazonScience/massive
+
+- Bitext customer-support / retail-banking datasets — License: CDLA-Sharing-1.0
+  (share-alike). (c) Bitext Innovations, 2024. These are loaded from HuggingFace
+  at runtime and are NOT redistributed in this repo; any derived data that
+  reproduces Bitext content must itself be licensed CDLA-Sharing-1.0 with the
+  "changed files" notice. https://cdla.dev/sharing-1-0/
+
+Model outputs: any synthetic text generated with a hosted or open-weight model is
+labelled as AI-generated. This project does not use model outputs to train or
+develop a competing model.
+
+Not affiliated with, endorsed by, or representing any broker. Not financial
+advice. Regulatory text, where referenced, belongs to its respective authority.

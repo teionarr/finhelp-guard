@@ -1,0 +1,8 @@
+{"id": "kb-withdraw-en", "lang": "en", "text": "Withdrawals: the minimum withdrawal amount is $30. Standard withdrawals are processed within 2 business days. A flat $5 withdrawal fee applies to each withdrawal."}
+{"id": "kb-verify-en", "lang": "en", "text": "Account verification (KYC): identity verification is usually completed within 3 business days after you upload a valid government ID and proof of address. You can check your verification status in Settings."}
+{"id": "kb-inactivity-en", "lang": "en", "text": "Inactivity: accounts with no login for 12 months are charged a $10 monthly inactivity fee. Logging in at any time stops the fee."}
+{"id": "kb-deposit-en", "lang": "en", "text": "Deposits: the minimum first-time deposit is $50. Card and bank-transfer deposits are supported. Deposits by card are credited instantly; bank transfers can take up to 4 business days."}
+{"id": "kb-reset-en", "lang": "en", "text": "Password reset: use 'Forgot password' on the login screen. A reset link is emailed to you and is valid for 60 minutes."}
+{"id": "kb-withdraw-es", "lang": "es", "text": "Retiros: el importe minimo de retiro es 30 $. Los retiros estandar se procesan en un plazo de 2 dias habiles. Se aplica una comision fija de 5 $ por cada retiro."}
+{"id": "kb-verify-es", "lang": "es", "text": "Verificacion de la cuenta (KYC): la verificacion de identidad suele completarse en un plazo de 3 dias habiles despues de subir un documento de identidad valido y un comprobante de domicilio."}
+{"id": "kb-deposit-es", "lang": "es", "text": "Depositos: el deposito minimo inicial es de 50 $. Se admiten depositos con tarjeta y transferencia bancaria. Los depositos con tarjeta se acreditan al instante."}

@@ -1,0 +1,29 @@
+# Tier A — deterministic, no keys, no spend. Green on every push/PR.
+name: tests
+on:
+  push: { branches: [main] }
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - name: unit tests
+        run: pytest -q
+      - name: eval gate (must be GREEN)
+        run: python evals/run_evals.py
+      - name: gate catches a regression (must be RED)
+        run: |
+          if python evals/run_evals.py --inject-regression; then
+            echo "regression was NOT caught — gate is broken" && exit 1
+          else
+            echo "gate correctly went red on the injected regression"
+          fi

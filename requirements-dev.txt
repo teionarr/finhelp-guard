@@ -1,0 +1,3 @@
+# Enough to run the offline demo, eval gate, and tests.
+pytest>=8.0
+# statsmodels>=0.14   # optional: enables the stats cross-check test (else skipped)
