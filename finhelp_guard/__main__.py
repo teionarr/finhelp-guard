@@ -51,12 +51,16 @@ def run_triage(live: bool = False) -> int:
 
     kb = load_kb(ROOT / "data" / "kb_synthetic.jsonl")
     model = LLMModel() if live else ScriptedModel(DEMO_SCRIPT)
+    judge = None
+    if live:
+        from finhelp_guard.models import LLMJudge  # wire the judge into the live agent
+        judge = LLMJudge()
     outdir = ROOT / "traces"
     outdir.mkdir(exist_ok=True)
-    kind = "LIVE LLM" if live else "scripted deterministic model (0 keys, 0 spend)"
+    kind = "LIVE LLM (agent + judge)" if live else "scripted deterministic model (0 keys, 0 spend)"
     print(f"finhelp-guard triage agent — {kind}\n" + "-" * 60)
     for ticket in DEMO_TICKETS:
-        res = triage(ticket, kb, model)
+        res = triage(ticket, kb, model, judge=judge)
         print(f"\n{ticket['id']}: {ticket['text']}")
         print(f"  tools called: {res.tools_used}")
         print(f"  gate: {'✅ PASS' if res.gate_passed else '🛑 ' + str(res.failed_rails)}  ->  route: {res.route}")

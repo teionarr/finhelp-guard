@@ -1,20 +1,32 @@
 """Support-triage agent: a real tool-calling loop with the guardrail gate wrapped
-around its output, and a full trace.
+around its output, an append-only audit trail, and enforced (not advisory) blocking.
 
-The loop is model-agnostic: a `Model` returns either a ToolCall or a Finalize on
-each step. Two implementations —
+The loop is model-agnostic: a `Model` returns a ToolCall, a Finalize, or an
+Escalate on each step.
   - `ScriptedModel`: deterministic, runs the entire loop in CI with 0 keys/spend.
-  - `LLMModel`: a real chat model (Azure/OpenAI/Ollama) via structured output,
-    for `python -m finhelp_guard --live` (see models.chat_model()).
-Same loop, same tools, same gate — you swap the brain.
+  - `LLMModel`: a real chat model (Azure/OpenAI/Nebius/Ollama), for `--triage --live`.
+
+Tier-1 safety properties enforced here (see the red-team findings in docs/):
+  - **Authorization**: tools may only touch the ticket's OWN account (no cross-account
+    reads), enforced in the tool layer below the model — the prompt cannot override it.
+  - **Enforced gate**: a blocked reply has `sent_reply=None` — there is no code path
+    that emits text unless the gate passed.
+  - **Fail-safe parsing**: unparseable model output escalates to a human, it does not
+    ship a gate-passing platitude.
+  - **Budgets**: capped input, truncated history, de-duplicated tool calls, bounded steps.
 """
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Protocol, Union
 
 from . import tools as T
+from .audit import audit_decision
 from .rails import DEFAULT_RAILS, run_gate
+
+MAX_TICKET_CHARS = 4000
+MAX_HISTORY_STEPS = 8
 
 
 @dataclass
@@ -28,7 +40,12 @@ class Finalize:
     reply: str
 
 
-Action = Union[ToolCall, Finalize]
+@dataclass
+class Escalate:
+    reason: str
+
+
+Action = Union[ToolCall, Finalize, Escalate]
 
 
 class Model(Protocol):
@@ -38,12 +55,14 @@ class Model(Protocol):
 @dataclass
 class TriageResult:
     ticket_id: str
-    reply: str
-    route: str                 # "mark_ready" (clean) | "human_review" (flagged)
+    reply: str                    # text surfaced (draft if clean, deflection/draft if blocked)
+    route: str                    # "mark_ready" (clean) | "human_review" (flagged/escalated)
     gate_passed: bool
     failed_rails: List[str]
     tools_used: List[str]
     trace: List[Dict]
+    sent: bool = False            # true only when the reply may actually be sent
+    sent_reply: Optional[str] = None  # the ONLY sendable text; None when blocked
 
     def summary(self) -> str:
         return (f"[{self.ticket_id}] tools={self.tools_used} "
@@ -52,10 +71,8 @@ class TriageResult:
 
 
 def _tool_facts(name: str, result: Dict) -> str:
-    """Turn an authoritative tool result into grounding evidence, so figures the
-    agent legitimately got from a tool (e.g. an account balance) aren't flagged
-    as ungrounded. (Surfaced by a live run: the model quoted the $ balance from
-    lookup_account, which the KB-only grounding wrongly rejected.)"""
+    """Turn an AUTHORIZED tool result into grounding evidence (cross-account results
+    never reach here — they're denied in _run_tool)."""
     if name == "lookup_account":
         return (f"Account {result.get('id')}: balance ${result.get('balance_usd', 0):.2f}; "
                 f"verified={result.get('verified')}; can_withdraw={result.get('can_withdraw')}.")
@@ -65,30 +82,51 @@ def _tool_facts(name: str, result: Dict) -> str:
 
 
 def _run_tool(call: ToolCall, retriever, ticket: Dict) -> Any:
-    if call.name == "lookup_account":
-        return T.lookup_account(call.args.get("account_id") or ticket.get("account_id", ""))
+    owner = ticket.get("account_id", "")
+    if call.name in ("lookup_account", "create_followup_ticket"):
+        requested = call.args.get("account_id") or owner
+        # AUTHORIZATION (below the model): only the ticket's own account.
+        if requested != owner:
+            return {"error": "unauthorized", "denied": True,
+                    "detail": f"tool {call.name} may only access the ticket's own account ({owner}), not {requested}"}
+        if call.name == "lookup_account":
+            return T.lookup_account(owner)
+        return T.create_followup_ticket(owner, call.args.get("summary", ""))
     if call.name == "search_kb":
         return retriever.retrieve(call.args.get("query", ticket.get("text", "")), k=2, lang=ticket.get("lang", "en"))
-    if call.name == "create_followup_ticket":
-        return T.create_followup_ticket(call.args.get("account_id") or ticket.get("account_id", ""),
-                                        call.args.get("summary", ""))
     return {"error": f"unknown tool {call.name}"}
 
 
 def triage(ticket: Dict, retriever, model: Model, judge=None, max_steps: int = 6) -> TriageResult:
+    ticket = {**ticket, "text": str(ticket.get("text", ""))[:MAX_TICKET_CHARS]}  # input cap
     history: List[Dict] = []
     trace: List[Dict] = []
     contexts: List[str] = []
     tools_used: List[str] = []
+    seen_calls: set = set()
+
+    def finish(res: TriageResult) -> TriageResult:
+        audit_decision(ticket, res)   # append-only audit log for every decision
+        return res
 
     for step in range(max_steps):
-        action = model.act(ticket, history)
+        action = model.act(ticket, history[-MAX_HISTORY_STEPS:])
+
+        if isinstance(action, Escalate):
+            trace.append({"step": step, "type": "escalate", "reason": action.reason})
+            return finish(TriageResult(ticket["id"], "", "human_review", False, ["escalated"],
+                                       tools_used, trace, sent=False, sent_reply=None))
 
         if isinstance(action, ToolCall):
-            result = _run_tool(action, retriever, ticket)
+            key = (action.name, json.dumps(action.args, sort_keys=True, default=str))
+            if key in seen_calls:                     # de-dup: block tool-call amplification
+                result: Any = {"error": "duplicate tool call skipped", "denied": True}
+            else:
+                seen_calls.add(key)
+                result = _run_tool(action, retriever, ticket)
             if isinstance(result, list):                       # KB snippets
                 contexts.extend(result)
-            elif isinstance(result, dict) and "error" not in result:  # authoritative tool facts
+            elif isinstance(result, dict) and "error" not in result:   # authorized tool facts
                 contexts.append(_tool_facts(action.name, result))
             history.append({"tool": action.name, "args": action.args, "result": result})
             tools_used.append(action.name)
@@ -96,20 +134,37 @@ def triage(ticket: Dict, retriever, model: Model, judge=None, max_steps: int = 6
                           "args": action.args, "result": result})
             continue
 
-        # Finalize: run the guardrail gate over the draft + everything retrieved.
+        # Finalize -> run the guardrail gate over the draft + everything retrieved.
         gate = run_gate(action.reply, contexts, DEFAULT_RAILS, judge=judge)
-        route = "mark_ready" if gate.passed else "human_review"
-        reply = action.reply
-        for r in gate.results:                       # apply a rail's repair if it offers one
+        passed = gate.passed
+        route = "mark_ready" if passed else "human_review"
+        display = action.reply
+        for r in gate.results:                        # a rail may suggest a compliant repair
             if not r.passed and r.fix_value:
-                reply = r.fix_value
+                display = r.fix_value
+        sent_reply = action.reply if passed else None  # ENFORCED: no sendable text when blocked
         trace.append({"step": step, "type": "finalize", "draft": action.reply,
-                      "gate_passed": gate.passed, "failed_rails": gate.failed_rails,
-                      "route": route, "sent_reply": reply})
-        return TriageResult(ticket["id"], reply, route, gate.passed, gate.failed_rails, tools_used, trace)
+                      "gate_passed": passed, "failed_rails": gate.failed_rails,
+                      "route": route, "sent": passed, "sent_reply": sent_reply})
+        return finish(TriageResult(ticket["id"], display, route, passed, gate.failed_rails,
+                                   tools_used, trace, sent=passed, sent_reply=sent_reply))
 
     trace.append({"step": max_steps, "type": "aborted", "reason": "max_steps reached"})
-    return TriageResult(ticket["id"], "", "human_review", False, ["max_steps"], tools_used, trace)
+    return finish(TriageResult(ticket["id"], "", "human_review", False, ["max_steps"],
+                               tools_used, trace, sent=False, sent_reply=None))
+
+
+def _extract_json(raw: str) -> dict:
+    """Robust: strip code fences / prose and parse the first JSON object."""
+    s = str(raw).strip()
+    if "```" in s:
+        s = s.split("```", 2)[1]
+        if s.lstrip().lower().startswith("json"):
+            s = s.lstrip()[4:]
+    start, end = s.find("{"), s.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        s = s[start:end + 1]
+    return json.loads(s)
 
 
 class ScriptedModel:
@@ -128,29 +183,28 @@ class ScriptedModel:
 
 
 class LLMModel:
-    """Live model (Azure/OpenAI/Ollama) that chooses the next action via structured
-    output. Used only by `--live`; never run in CI. Model-agnostic so it works with
-    a local Ollama/vLLM server for a keyless real-LLM run."""
+    """Live model that chooses the next action via structured JSON. Model-agnostic
+    (works with a local Ollama/vLLM server for a keyless real-LLM run)."""
 
     def __init__(self, model=None):
         from .models import chat_model
         self._model = model or chat_model()
 
     def act(self, ticket: Dict, history: List[Dict]) -> Action:
-        import json
         tool_docs = json.dumps(T.TOOL_SCHEMAS)
         sys = ("You are a support-ops triage agent for a regulated broker. Use tools to "
-               "gather facts, then draft a reply grounded ONLY in tool results. Never give "
-               "investment advice. Respond with ONE JSON object: either "
-               '{"tool": "<name>", "args": {...}} or {"final": "<reply>"}. Tools: ' + tool_docs)
-        convo = json.dumps({"ticket": ticket, "history": history})
+               "gather facts about the CUSTOMER'S OWN account only, then draft a reply grounded "
+               "ONLY in tool/KB results. Never give investment advice. Respond with ONE JSON "
+               'object: {"tool":"<name>","args":{...}} or {"final":"<reply>"}. Tools: ' + tool_docs)
+        convo = json.dumps({"ticket": ticket, "history": history})[:8000]  # bounded prompt
         raw = self._model.invoke([("system", sys), ("human", convo)]).content
         try:
-            d = json.loads(raw)
+            d = _extract_json(raw)
         except Exception:
-            return Finalize("I'll route this to a human colleague to be safe.")
+            # Fail safe: unparseable output escalates to a human (never ships a platitude).
+            return Escalate(reason=f"unparseable model output: {str(raw)[:120]}")
         if "tool" in d:
-            return ToolCall(d["tool"], d.get("args", {}))
+            return ToolCall(str(d["tool"]), d.get("args", {}) if isinstance(d.get("args"), dict) else {})
         return Finalize(str(d.get("final", "")))
 
 
@@ -166,13 +220,11 @@ DEMO_TICKETS: List[Dict] = [
 ]
 
 DEMO_SCRIPT: Dict[str, List[Action]] = {
-    # Straightforward policy question: look up account, search KB, answer grounded.
     "T-1": [
         ToolCall("lookup_account", {"account_id": "AC-1001"}),
         ToolCall("search_kb", {"query": "withdrawal fee and time"}),
         Finalize("The withdrawal fee is $5 and withdrawals are processed within 2 business days."),
     ],
-    # Blocked account: look up (not verified), search KB, open a follow-up, explain grounded.
     "T-2": [
         ToolCall("lookup_account", {"account_id": "AC-2002"}),
         ToolCall("search_kb", {"query": "account verification"}),
@@ -181,7 +233,6 @@ DEMO_SCRIPT: Dict[str, List[Action]] = {
                  "verification is usually completed within 3 business days after you upload a "
                  "valid government ID and proof of address. I've opened a ticket for our team."),
     ],
-    # Advice solicitation: the drafted reply crosses the line -> gate blocks -> deflection.
     "T-3": [
         ToolCall("lookup_account", {"account_id": "AC-1001"}),
         Finalize("You should buy Tesla now with your balance — it looks strong."),

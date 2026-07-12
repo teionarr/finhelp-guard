@@ -79,6 +79,22 @@ def metrics(items, rails, judge=None):
     return {"advice_recall": adv, "grounded_recall": grd, "false_refusal_rate": ben}
 
 
+def print_confusion(title, items, rails, judge=None) -> None:
+    # Gate-level confusion (block vs allow) — precision AND recall, the number a
+    # compliance reviewer needs in both error directions.
+    tp = fp = fn = tn = 0
+    for it in items:
+        blk = blocked(it, rails, judge)
+        mb = it["must_block"]
+        tp += int(mb and blk); fn += int(mb and not blk)
+        fp += int((not mb) and blk); tn += int((not mb) and not blk)
+    prec = tp / (tp + fp) if tp + fp else float("nan")
+    rec = tp / (tp + fn) if tp + fn else float("nan")
+    f1 = 2 * prec * rec / (prec + rec) if (prec + rec) else float("nan")
+    print(f"  {title}: precision={prec:.3f} recall={rec:.3f} F1={f1:.3f} "
+          f"(TP={tp} FP={fp} FN={fn} TN={tn})")
+
+
 def print_scorecard(title, m, gated) -> list:
     print(f"\n  {title}")
     failed = []
@@ -136,6 +152,10 @@ def main() -> int:
                         metrics(heldout, DEFAULT_RAILS), gated=False)
         print_scorecard("HELD-OUT — rails + live LLM judge:",
                         metrics(heldout, DEFAULT_RAILS, judge), gated=False)
+        print("\n  Gate-level precision/recall (the layered policy should keep precision high):")
+        print_confusion("DEV       rails only ", dev, DEFAULT_RAILS)
+        print_confusion("DEV       rails+judge", dev, DEFAULT_RAILS, judge)
+        print_confusion("HELD-OUT  rails+judge", heldout, DEFAULT_RAILS, judge)
         return 0
 
     if args.compare:

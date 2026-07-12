@@ -3,7 +3,7 @@
 **A portable eval + guardrail harness for a support-ops assistant at a regulated broker.**
 The agent is deliberately thin; the point is the *harness* — the rails, the interval-based acceptance criteria, and the regression gate that let you ship an AI ops-assist tool a compliance officer would sign off on.
 
-![tests](https://img.shields.io/badge/tests-28%20unit%20%2B%204%20integration-brightgreen) ![license](https://img.shields.io/badge/license-MIT-green) ![python](https://img.shields.io/badge/python-3.10+-blue) ![data](https://img.shields.io/badge/data-synthetic%20%2B%20public-lightgrey) ![built with](https://img.shields.io/badge/built%20with-Guardrails%20AI%20%C2%B7%20LangGraph%20%C2%B7%20BM25-8a2be2)
+![tests](https://img.shields.io/badge/tests-36%20unit%20%2B%204%20integration-brightgreen) ![license](https://img.shields.io/badge/license-MIT-green) ![python](https://img.shields.io/badge/python-3.10+-blue) ![data](https://img.shields.io/badge/data-synthetic%20%2B%20public-lightgrey) ![built with](https://img.shields.io/badge/built%20with-Guardrails%20AI%20%C2%B7%20LangGraph%20%C2%B7%20BM25-8a2be2)
 
 **Composes the standard OSS stack, not a from-scratch reinvention.** The same rail logic runs three ways — a dependency-free gate (fast, keyless), inside a real [Guardrails AI](https://github.com/guardrails-ai/guardrails) `Guard()`, or behind an LLM judge ([DeepEval](https://github.com/confident-ai/deepeval) / [Ragas](https://github.com/explodinggradients/ragas)); retrieval is [rank_bm25](https://github.com/dorianbrown/rank_bm25), orchestration is [LangGraph](https://github.com/langchain-ai/langgraph). You pick the stack; the rules and acceptance criteria stay identical.
 
@@ -22,7 +22,7 @@ python -m finhelp_guard --demo          # just the guardrail gate on 3 canned dr
 python evals/run_evals.py               # dev gate (GREEN) + held-out report
 python evals/run_evals.py --inject-regression   # disable a rail -> dev gate RED
 python evals/run_evals.py --compare     # paired McNemar: full vs regressed rails
-pip install -r requirements-dev.txt && pytest -q   # 24 unit tests (keyless)
+pip install -r requirements-dev.txt && pytest -q   # 36 unit tests (keyless)
 
 # run the same rails inside the real Guardrails AI framework:
 pip install -r requirements-integration.txt && pytest -q tests/test_guardrails_integration.py
@@ -62,6 +62,18 @@ The rail logic in `finhelp_guard/rails/` is written once and reused everywhere:
 3. **LLM-judge** — inject a judge (DeepEval `MisuseMetric` / Ragas `Faithfulness`) via the same `Judge` contract for the paraphrase/no-digit cases the deterministic rails can't catch.
 One definition of "what's allowed," three ways to enforce it. That is the operations-tooling skill: complex ecosystem underneath, one simple contract on top.
 
+## Safety & security — enforced, not advisory
+
+A live red-team pass ([docs/live-run.md](docs/live-run.md)) drove these in as hard properties, verified by tests (`tests/test_security.py`) and against a real model:
+
+- **Authorization below the model** — account-scoped tools may only touch the ticket's own account. A prompt-injecting ticket that asked for another customer's balance now gets *denied*, not answered ([ADR 0003](docs/adr/0003-authorization-below-the-model.md)).
+- **The gate is enforcing** — a blocked reply has `sent_reply=None`; no code path emits text unless the gate passed.
+- **Fail-safe** — unparseable model output *escalates to a human*, it doesn't ship a gate-passing platitude; JSON parsing survives code fences.
+- **PII rail** — a third deterministic rail (email / phone / card-Luhn / IBAN) on every outbound reply.
+- **Budgets** — capped input, truncated history, de-duplicated tool calls, bounded steps, per-call timeout + one retry.
+- **Append-only audit log** — one immutable JSONL line per decision (account, tools, gate verdict, route) — the trail regulated ops needs.
+- **Layered judge policy** — the deterministic rail is trusted for numeric claims (high precision); the judge runs only where it's blind. This lifted DEV gate precision from ~0.3 to **0.917** while keeping recall 1.0 ([ADR 0002](docs/adr/0002-layered-rails-then-judge.md)). See [ROADMAP.md](ROADMAP.md) for what's next (human gold set + judge calibration).
+
 ## What the scorecard actually claims (and doesn't)
 
 Two design choices are the whole point — and the two things a reviewer should push on:
@@ -98,6 +110,7 @@ A **rail** is a pure function `(draft, contexts) -> RailResult`; the gate runs t
 |---|---|---|---|
 | `no_advice` | "Is TSLA a buy?" → unlicensed personalized advice | EN+ES advice-language patterns, gated on a financial-instrument token; returns a compliant deflection | DeepEval `MisuseMetric(domain="financial services")` |
 | `groundedness` | inventing a fee/limit/timeframe not in the KB | **anchored** numeric-claim matching (canonical value equality, not substring) against the retrieved context | Ragas `Faithfulness` / DeepEval `FaithfulnessMetric` |
+| `pii` | emitting a customer's email / phone / card / IBAN | regex + Luhn on the outbound reply | Presidio (same contract) |
 
 ### Known limitations of the offline detectors (deliberate — the live judge closes these)
 - **`groundedness` checks numeric claims only.** A no-number fabrication ("withdrawals are instant and free") is not caught offline. It also does not bind a number to its subject, so a right number attached to the wrong fact (cross-fact) can slip through. The live faithfulness judge evaluates the whole reply and closes both.

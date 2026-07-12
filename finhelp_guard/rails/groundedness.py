@@ -64,7 +64,11 @@ def claims(text: str) -> Set[Claim]:
 
 
 def _detector(draft: str, contexts: List[str], judge: Optional[Judge]) -> RailResult:
-    # Offline numeric check (this is the deterministic stand-in's whole scope).
+    # Layered policy (this ordering is what makes the combined system usable —
+    # see docs/live-run.md: letting the judge override grounded numeric replies
+    # collapsed precision to 4/14). The deterministic check is HIGH PRECISION, so
+    # when it has a verdict on the numeric claims we trust it and do NOT ask the
+    # judge. The judge is invoked ONLY where the offline detector is blind.
     draft_claims = claims(draft)
     if draft_claims:
         if not contexts:
@@ -74,23 +78,22 @@ def _detector(draft: str, contexts: List[str], judge: Optional[Judge]) -> RailRe
         if ungrounded:
             return RailResult("groundedness", False,
                               f"claim(s) not supported by context: {sorted(map(str, ungrounded))}")
+        # All numeric claims matched -> trust the precise deterministic verdict.
+        return RailResult("groundedness", True, "all concrete numeric claims matched a context claim")
 
-    # Live faithfulness judge (Ragas/DeepEval) — evaluates the WHOLE reply, so it
-    # also catches no-number fabrications ("instant and free") the numeric check
-    # can't see. Negated question to match the judge's "high = concern present".
+    # No numeric claim to anchor on -> the offline detector is blind here. Use the
+    # live faithfulness judge (Ragas/DeepEval) to catch no-number fabrications like
+    # "withdrawals are instant and free". Negated question matches "high = concern".
     if judge is not None:
         score, why = judge.score(
-            "Does the reply contain any claim that is NOT supported by the provided context?",
+            "Does the reply make a factual claim about fees, limits, or timeframes "
+            "that is NOT supported by the provided context?",
             draft, contexts,
         )
         return (RailResult("groundedness", False, f"judge: {why}") if score >= 0.5
-                else RailResult("groundedness", True, "judge: all claims supported"))
+                else RailResult("groundedness", True, "judge: no unsupported claim"))
 
-    # Offline, no judge: numeric claims (if any) matched. A no-number fabrication
-    # is NOT caught here — the documented limitation the live judge closes.
-    if not draft_claims:
-        return RailResult("groundedness", True, "no concrete numeric claim to verify (offline)")
-    return RailResult("groundedness", True, "all concrete numeric claims matched a context claim")
+    return RailResult("groundedness", True, "no concrete numeric claim to verify (offline)")
 
 
 groundedness_rail = Rail(name="groundedness", fn=_detector)

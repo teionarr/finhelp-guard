@@ -15,14 +15,16 @@ from .rails.base import Judge
 
 def chat_model(temperature: float = 0.0):
     """Return a LangChain chat model from env. Imported lazily so the offline
-    path never requires langchain."""
+    path never requires langchain. Bounded with a request timeout + one retry so
+    a hung/slow provider can't stall a support request."""
+    budget = dict(timeout=float(os.getenv("FINHELP_LLM_TIMEOUT", "30")), max_retries=1)
     if os.getenv("AZURE_OPENAI_API_KEY"):
         from langchain_openai import AzureChatOpenAI
 
         return AzureChatOpenAI(
             azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o-mini"),
             api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-01-preview"),
-            temperature=temperature,
+            temperature=temperature, **budget,
         )
     from langchain_openai import ChatOpenAI
 
@@ -32,13 +34,13 @@ def chat_model(temperature: float = 0.0):
             model=os.getenv("NEBIUS_MODEL", "meta-llama/Meta-Llama-3.1-8B-Instruct"),
             base_url=os.getenv("NEBIUS_BASE_URL", "https://api.studio.nebius.ai/v1"),
             api_key=os.getenv("NEBIUS_API_KEY"),
-            temperature=temperature,
+            temperature=temperature, **budget,
         )
     # Any other OpenAI-compatible endpoint (OpenAI, local Ollama/vLLM).
     return ChatOpenAI(
         model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         base_url=os.getenv("OPENAI_BASE_URL") or None,
-        temperature=temperature,
+        temperature=temperature, **budget,
     )
 
 

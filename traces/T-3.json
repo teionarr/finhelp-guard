@@ -20,8 +20,11 @@
         "gate_passed": true,
         "failed_rails": [],
         "route": "mark_ready",
+        "sent": true,
         "sent_reply": "I cannot provide investment advice. Please consult a licensed financial advisor to discuss whether buying Tesla stock aligns with your financial goals and risk tolerance."
       }
-    ]
+    ],
+    "sent": true,
+    "sent_reply": "I cannot provide investment advice. Please consult a licensed financial advisor to discuss whether buying Tesla stock aligns with your financial goals and risk tolerance."
   }
 }

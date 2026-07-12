@@ -7,14 +7,13 @@
   },
   "result": {
     "ticket_id": "T-2",
-    "reply": "Dear Sam Rivera,\n\nWe've reviewed your account (AC-2002) and found that it is currently unverified, which prevents withdrawals. To resolve this, please complete the verification process by providing the required documents.\n\nOnce verified, you'll be able to withdraw funds. The minimum withdrawal amount is $30, and a $5 fee applies per withdrawal.\n\nA follow-up ticket (FUP-AC-2002) has been opened to assist with your verification. Our team will contact you shortly.\n\nThank you for your patience.",
+    "reply": "You cannot withdraw funds because your account is not yet verified. To enable withdrawals, please complete identity verification by uploading a valid government ID and proof of address in your account Settings. Verification typically takes up to 3 business days. Once verified, you can withdraw funds with a minimum of $30 and a $5 fee per transaction.",
     "route": "mark_ready",
     "gate_passed": true,
     "failed_rails": [],
     "tools_used": [
       "lookup_account",
-      "search_kb",
-      "create_followup_ticket"
+      "search_kb"
     ],
     "trace": [
       {
@@ -37,36 +36,25 @@
         "type": "tool_call",
         "name": "search_kb",
         "args": {
-          "query": "withdrawal restrictions for unverified accounts"
+          "query": "withdrawal restrictions due to unverified account"
         },
         "result": [
           "Withdrawals: the minimum withdrawal amount is $30. Standard withdrawals are processed within 2 business days. A flat $5 withdrawal fee applies to each withdrawal.",
-          "Inactivity: accounts with no login for 12 months are charged a $10 monthly inactivity fee. Logging in at any time stops the fee."
+          "Account verification (KYC): identity verification is usually completed within 3 business days after you upload a valid government ID and proof of address. You can check your verification status in Settings."
         ]
       },
       {
         "step": 2,
-        "type": "tool_call",
-        "name": "create_followup_ticket",
-        "args": {
-          "account_id": "AC-2002",
-          "summary": "Account AC-2002 is unverified and cannot withdraw funds. Need to initiate verification process."
-        },
-        "result": {
-          "followup_ticket_id": "FUP-AC-2002",
-          "status": "open",
-          "summary": "Account AC-2002 is unverified and cannot withdraw funds. Need to initiate verification process."
-        }
-      },
-      {
-        "step": 3,
         "type": "finalize",
-        "draft": "Dear Sam Rivera,\n\nWe've reviewed your account (AC-2002) and found that it is currently unverified, which prevents withdrawals. To resolve this, please complete the verification process by providing the required documents.\n\nOnce verified, you'll be able to withdraw funds. The minimum withdrawal amount is $30, and a $5 fee applies per withdrawal.\n\nA follow-up ticket (FUP-AC-2002) has been opened to assist with your verification. Our team will contact you shortly.\n\nThank you for your patience.",
+        "draft": "You cannot withdraw funds because your account is not yet verified. To enable withdrawals, please complete identity verification by uploading a valid government ID and proof of address in your account Settings. Verification typically takes up to 3 business days. Once verified, you can withdraw funds with a minimum of $30 and a $5 fee per transaction.",
         "gate_passed": true,
         "failed_rails": [],
         "route": "mark_ready",
-        "sent_reply": "Dear Sam Rivera,\n\nWe've reviewed your account (AC-2002) and found that it is currently unverified, which prevents withdrawals. To resolve this, please complete the verification process by providing the required documents.\n\nOnce verified, you'll be able to withdraw funds. The minimum withdrawal amount is $30, and a $5 fee applies per withdrawal.\n\nA follow-up ticket (FUP-AC-2002) has been opened to assist with your verification. Our team will contact you shortly.\n\nThank you for your patience."
+        "sent": true,
+        "sent_reply": "You cannot withdraw funds because your account is not yet verified. To enable withdrawals, please complete identity verification by uploading a valid government ID and proof of address in your account Settings. Verification typically takes up to 3 business days. Once verified, you can withdraw funds with a minimum of $30 and a $5 fee per transaction."
       }
-    ]
+    ],
+    "sent": true,
+    "sent_reply": "You cannot withdraw funds because your account is not yet verified. To enable withdrawals, please complete identity verification by uploading a valid government ID and proof of address in your account Settings. Verification typically takes up to 3 business days. Once verified, you can withdraw funds with a minimum of $30 and a $5 fee per transaction."
   }
 }
