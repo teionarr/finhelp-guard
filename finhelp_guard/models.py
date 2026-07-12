@@ -24,9 +24,17 @@ def chat_model(temperature: float = 0.0):
             api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-01-preview"),
             temperature=temperature,
         )
-    # OpenAI-compatible (local Ollama/vLLM or OpenAI)
     from langchain_openai import ChatOpenAI
 
+    # Nebius Token Factory (OpenAI-compatible) — cheap open models, good for verification.
+    if os.getenv("NEBIUS_API_KEY"):
+        return ChatOpenAI(
+            model=os.getenv("NEBIUS_MODEL", "meta-llama/Meta-Llama-3.1-8B-Instruct"),
+            base_url=os.getenv("NEBIUS_BASE_URL", "https://api.studio.nebius.ai/v1"),
+            api_key=os.getenv("NEBIUS_API_KEY"),
+            temperature=temperature,
+        )
+    # Any other OpenAI-compatible endpoint (OpenAI, local Ollama/vLLM).
     return ChatOpenAI(
         model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         base_url=os.getenv("OPENAI_BASE_URL") or None,
