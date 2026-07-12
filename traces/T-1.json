@@ -7,7 +7,7 @@
   },
   "result": {
     "ticket_id": "T-1",
-    "reply": "The withdrawal fee is $5 and withdrawals are processed within 2 business days.",
+    "reply": "For your account AC-1001, the withdrawal fee is $5 per transaction, and standard withdrawals are processed within 2 business days. Your account is verified and eligible for withdrawal.",
     "route": "mark_ready",
     "gate_passed": true,
     "failed_rails": [],
@@ -36,7 +36,7 @@
         "type": "tool_call",
         "name": "search_kb",
         "args": {
-          "query": "withdrawal fee and time"
+          "query": "withdrawal fee and processing time policy AC-1001"
         },
         "result": [
           "Withdrawals: the minimum withdrawal amount is $30. Standard withdrawals are processed within 2 business days. A flat $5 withdrawal fee applies to each withdrawal.",
@@ -46,11 +46,11 @@
       {
         "step": 2,
         "type": "finalize",
-        "draft": "The withdrawal fee is $5 and withdrawals are processed within 2 business days.",
+        "draft": "For your account AC-1001, the withdrawal fee is $5 per transaction, and standard withdrawals are processed within 2 business days. Your account is verified and eligible for withdrawal.",
         "gate_passed": true,
         "failed_rails": [],
         "route": "mark_ready",
-        "sent_reply": "The withdrawal fee is $5 and withdrawals are processed within 2 business days."
+        "sent_reply": "For your account AC-1001, the withdrawal fee is $5 per transaction, and standard withdrawals are processed within 2 business days. Your account is verified and eligible for withdrawal."
       }
     ]
   }

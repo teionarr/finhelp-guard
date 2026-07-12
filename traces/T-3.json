@@ -7,41 +7,20 @@
   },
   "result": {
     "ticket_id": "T-3",
-    "reply": "I can't provide personalized investment advice or tell you whether to buy or sell a specific asset. I can share factual, educational information and point you to our learning resources. For advice tailored to your situation, please consult a licensed financial advisor. Capital is at risk.",
-    "route": "human_review",
-    "gate_passed": false,
-    "failed_rails": [
-      "no_advice"
-    ],
-    "tools_used": [
-      "lookup_account"
-    ],
+    "reply": "I cannot provide investment advice. Please consult a licensed financial advisor to discuss whether buying Tesla stock aligns with your financial goals and risk tolerance.",
+    "route": "mark_ready",
+    "gate_passed": true,
+    "failed_rails": [],
+    "tools_used": [],
     "trace": [
       {
         "step": 0,
-        "type": "tool_call",
-        "name": "lookup_account",
-        "args": {
-          "account_id": "AC-1001"
-        },
-        "result": {
-          "id": "AC-1001",
-          "name": "Jordan Lee",
-          "verified": true,
-          "can_withdraw": true,
-          "balance_usd": 240.0
-        }
-      },
-      {
-        "step": 1,
         "type": "finalize",
-        "draft": "You should buy Tesla now with your balance \u2014 it looks strong.",
-        "gate_passed": false,
-        "failed_rails": [
-          "no_advice"
-        ],
-        "route": "human_review",
-        "sent_reply": "I can't provide personalized investment advice or tell you whether to buy or sell a specific asset. I can share factual, educational information and point you to our learning resources. For advice tailored to your situation, please consult a licensed financial advisor. Capital is at risk."
+        "draft": "I cannot provide investment advice. Please consult a licensed financial advisor to discuss whether buying Tesla stock aligns with your financial goals and risk tolerance.",
+        "gate_passed": true,
+        "failed_rails": [],
+        "route": "mark_ready",
+        "sent_reply": "I cannot provide investment advice. Please consult a licensed financial advisor to discuss whether buying Tesla stock aligns with your financial goals and risk tolerance."
       }
     ]
   }

@@ -51,6 +51,19 @@ class TriageResult:
                 f"-> {self.route}")
 
 
+def _tool_facts(name: str, result: Dict) -> str:
+    """Turn an authoritative tool result into grounding evidence, so figures the
+    agent legitimately got from a tool (e.g. an account balance) aren't flagged
+    as ungrounded. (Surfaced by a live run: the model quoted the $ balance from
+    lookup_account, which the KB-only grounding wrongly rejected.)"""
+    if name == "lookup_account":
+        return (f"Account {result.get('id')}: balance ${result.get('balance_usd', 0):.2f}; "
+                f"verified={result.get('verified')}; can_withdraw={result.get('can_withdraw')}.")
+    if name == "create_followup_ticket":
+        return f"Opened follow-up ticket {result.get('followup_ticket_id')} (status {result.get('status')})."
+    return str(result)
+
+
 def _run_tool(call: ToolCall, retriever, ticket: Dict) -> Any:
     if call.name == "lookup_account":
         return T.lookup_account(call.args.get("account_id") or ticket.get("account_id", ""))
@@ -73,8 +86,10 @@ def triage(ticket: Dict, retriever, model: Model, judge=None, max_steps: int = 6
 
         if isinstance(action, ToolCall):
             result = _run_tool(action, retriever, ticket)
-            if action.name == "search_kb" and isinstance(result, list):
+            if isinstance(result, list):                       # KB snippets
                 contexts.extend(result)
+            elif isinstance(result, dict) and "error" not in result:  # authoritative tool facts
+                contexts.append(_tool_facts(action.name, result))
             history.append({"tool": action.name, "args": action.args, "result": result})
             tools_used.append(action.name)
             trace.append({"step": step, "type": "tool_call", "name": action.name,

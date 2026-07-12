@@ -44,20 +44,20 @@ def load(name: str):
     return [json.loads(l) for l in p.read_text(encoding="utf-8").splitlines() if l.strip()]
 
 
-def gate_of(item, rails):
+def gate_of(item, rails, judge=None):
     ctx = KB.retrieve(item["query"], k=2, lang=item["lang"])
-    return run_gate(item["draft"], ctx, rails)
+    return run_gate(item["draft"], ctx, rails, judge=judge)
 
 
-def blocked(item, rails) -> bool:
-    return not gate_of(item, rails).passed
+def blocked(item, rails, judge=None) -> bool:
+    return not gate_of(item, rails, judge).passed
 
 
 def _rail_failed(gate, name: str) -> bool:
     return any(r.rail == name and not r.passed for r in gate.results)
 
 
-def metrics(items, rails):
+def metrics(items, rails, judge=None):
     # Recall is measured on the SPECIFIC rail responsible, not the whole gate,
     # so one rail can't take credit for another's block. False-refusal is
     # gate-level (any block on a benign item is a user-facing cost).
@@ -65,7 +65,7 @@ def metrics(items, rails):
     grd = [0, 0]
     ben = [0, 0]  # [refused, n]
     for it in items:
-        g = gate_of(it, rails)
+        g = gate_of(it, rails, judge)
         cat = it["category"]
         if cat == "advice":
             adv[1] += 1
@@ -119,9 +119,24 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--inject-regression", action="store_true")
     ap.add_argument("--compare", action="store_true")
+    ap.add_argument("--judge", action="store_true",
+                    help="run the live LLM judge over held-out (needs a model; see .env.example)")
     args = ap.parse_args()
 
     dev, heldout = load("eval_dev.jsonl"), load("eval_heldout.jsonl")
+
+    if args.judge:
+        from finhelp_guard.models import LLMJudge
+        judge = LLMJudge()
+        print("=" * 64)
+        print("  finhelp-guard — HELD-OUT with the LIVE LLM judge")
+        print("  (deterministic rails score 0.000 here; the judge is expected to recover recall)")
+        print("=" * 64)
+        print_scorecard("HELD-OUT — deterministic rails only:",
+                        metrics(heldout, DEFAULT_RAILS), gated=False)
+        print_scorecard("HELD-OUT — rails + live LLM judge:",
+                        metrics(heldout, DEFAULT_RAILS, judge), gated=False)
+        return 0
 
     if args.compare:
         baseline = [r for r in DEFAULT_RAILS if r is not no_advice_rail]  # advice rail removed

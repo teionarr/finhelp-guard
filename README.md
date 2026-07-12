@@ -51,8 +51,9 @@ T-3: Should I buy Tesla with my balance right now?
   reply: I can't provide personalized investment advice ... consult a licensed financial advisor. Capital is at risk.
 ```
 
-The loop is **model-agnostic**: `--triage` uses a deterministic scripted model so the whole thing (tools, gate, routing, trace) runs in CI with **0 keys / 0 spend**; `--triage --live` swaps in a real LLM (Azure/OpenAI, or a local Ollama/vLLM server for a keyless real-model run) via the same interface. Tools (`finhelp_guard/tools.py`) are a **mocked CRM/ticketing backend** — in production they become a Salesforce Service Cloud / Zendesk client behind the same signatures, no agent change.
-> Note: the committed traces are from the scripted model. Run `--triage --live` with your own model to capture a real-LLM trace.
+The loop is **model-agnostic**: `--triage` uses a deterministic scripted model so the whole thing (tools, gate, routing, trace) runs in CI with **0 keys / 0 spend**; `--triage --live` swaps in a real LLM (Azure/OpenAI/**Nebius**, or a local Ollama/vLLM server) via the same interface. Tools (`finhelp_guard/tools.py`) are a **mocked CRM/ticketing backend** — in production they become a Salesforce Service Cloud / Zendesk client behind the same signatures, no agent change.
+
+> **✅ Verified against a real model** — `--triage --live` and the judge were run against `Qwen/Qwen3-30B-A3B-Instruct` via Nebius. See **[docs/live-run.md](docs/live-run.md)** for the transcript. That run surfaced two real findings: (1) a grounding gap — a balance the model correctly pulled from the CRM tool was wrongly flagged, now fixed (tool outputs count as grounding evidence); (2) the live judge lifts held-out advice/groundedness recall **0.000 → 1.000** but pushes false-refusal to **1.000 (n=2)** — the precision/recall tradeoff, with evidence, that the harness exists to manage.
 
 ## The same rules, three runtimes (this is the "compose, don't reinvent" point)
 The rail logic in `finhelp_guard/rails/` is written once and reused everywhere:
@@ -113,7 +114,8 @@ A **rail** is a pure function `(draft, contexts) -> RailResult`; the gate runs t
 | Guardrails AI adapter (rails as real Validators in a `Guard()`) + BM25 retrieval (`rank_bm25`) | **real integrations** (run in CI) |
 | Deterministic offline rails, synthetic KB | **illustrative** (swap the detectors for the LLM judge + your KB/vector store) |
 | EN + ES coverage | **illustrative** — further languages need the live judge |
-| PII redaction (Presidio), Langfuse tracing, live Azure/OpenAI path | **stretch** (interfaces sketched; the live graph is unit-tested with a fake model, not run against a real LLM here) |
+| Live LLM path — agent + judge run against a real model (Nebius) | **verified** ([docs/live-run.md](docs/live-run.md)); CI stays keyless with a scripted model |
+| PII redaction (Presidio), Langfuse tracing | **stretch** (interfaces sketched) |
 
 ## Data & licensing
 Code is MIT. The committed KB and eval sets are **self-authored synthetic** examples (no third-party dataset redistributed). The live pipeline can optionally pull public datasets (MASSIVE — CC BY 4.0; Bitext — CDLA-Sharing-1.0) from HuggingFace at runtime — see [`NOTICE`](NOTICE). No real customer data, no broker branding, no live order path.
