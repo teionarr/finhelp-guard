@@ -75,6 +75,19 @@ A live red-team pass ([docs/live-run.md](docs/live-run.md)) drove these in as ha
 - **Append-only audit log** — one immutable JSONL line per decision (account, tools, gate verdict, route) — the trail regulated ops needs.
 - **Layered judge policy** — the deterministic rail is trusted for numeric claims (high precision); the judge runs only where it's blind. This lifted DEV gate precision from ~0.3 to **0.917** while keeping recall 1.0 ([ADR 0002](docs/adr/0002-layered-rails-then-judge.md)). See [ROADMAP.md](ROADMAP.md) for what's next (human gold set + judge calibration).
 
+## Adversarial review — risks found & fixed
+
+This build was put through **four rounds of adversarial red-teaming** (plus live stress tests against a real model). Those rounds surfaced **~30 issues that were fixed**, and **~10 residuals that are documented rather than hidden** ([LIMITATIONS.md](LIMITATIONS.md)). Every fixed item is a risk a team that skipped the red-team would have shipped to production.
+
+| Category | Fixed | Flagship examples (each a real, verified failure) |
+|---|---|---|
+| **Security** | ~8 | **Cross-account data leak** (a ticket could read another customer's balance → authorization enforced below the model); advisory gate that didn't actually block; the LLM judge never wired into the live agent; blocked draft leaking into the surfaced `reply`; unaudited live path; PII bypass/false-positive; unbounded cost/DoS. |
+| **Evaluation & calibration** | ~10 | **Decorative CI** (gated on the point estimate while printing a CI it would have failed) → interval-bound gate; **judge over-blocking** 10/14 benign → layered policy; a single global threshold that **broke the other judge** → per-judge thresholds; **PR-AUC math bug**; calibrating the wrong judge; circular (no held-out) eval; McNemar claimed but unwired. |
+| **Correctness / robustness** | ~6 | Groundedness **substring bug** ($3 "grounded" by $30) → anchored value matching; empty-context handling; number normalization; code-fence-robust JSON parsing; escalate-on-unparseable (was shipping a false "routing to a human" platitude). |
+| **Honesty / consistency** | ~6 | Stale/contradictory metrics in the README vs the cited transcript; "calibrated against a defensible gold set" when the gold set was empty; DeepEval/Ragas listed as if integrated; overclaimed test counts — all corrected, with a standing limitations register added. |
+
+The point isn't that a first draft had bugs — it's that a disciplined adversarial loop **found and closed them, and states what remains**. That is the tier-1 signal.
+
 ## What the scorecard actually claims (and doesn't)
 
 Two design choices are the whole point — and the two things a reviewer should push on:
