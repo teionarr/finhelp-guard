@@ -46,5 +46,5 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements-integration.txt
-      - name: rails run inside the real Guardrails AI Guard()
-        run: pytest -q tests/test_guardrails_integration.py
+      - name: rails inside real Guard() + dense/hybrid retrieval with real embeddings
+        run: pytest -q tests/test_guardrails_integration.py tests/test_dense_integration.py
