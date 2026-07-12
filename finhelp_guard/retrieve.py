@@ -106,6 +106,10 @@ def make_embedder() -> Embedder:
     else → HashingEmbedder (deterministic, non-semantic; prints an honest notice)
     """
     forced = os.getenv("FINHELP_EMBEDDER", "").strip().lower()
+    if forced not in ("", "hashing", "provider", "sentence-transformers"):
+        # Symmetric with load_kb: a typo shouldn't silently degrade to non-semantic.
+        raise ValueError(f"unknown FINHELP_EMBEDDER={forced!r} "
+                         "(expected hashing|provider|sentence-transformers)")
     if forced == "hashing":
         return HashingEmbedder()
     if forced == "provider" or (not forced and (

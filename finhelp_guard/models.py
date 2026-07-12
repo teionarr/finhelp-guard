@@ -46,14 +46,17 @@ def chat_model(temperature: float = 0.0):
 
 def embedding_model():
     """Return a LangChain embeddings client from env — the dense side of hybrid
-    retrieval. Mirrors ``chat_model()``'s provider selection so live runs use one
-    set of credentials. Imported lazily so the offline path never needs langchain."""
+    retrieval. Mirrors ``chat_model()``'s provider selection and request budget so
+    a hung provider can't stall retrieval. Imported lazily so the offline path
+    never needs langchain."""
+    budget = dict(timeout=float(os.getenv("FINHELP_LLM_TIMEOUT", "30")), max_retries=1)
     if os.getenv("AZURE_OPENAI_API_KEY"):
         from langchain_openai import AzureOpenAIEmbeddings
 
         return AzureOpenAIEmbeddings(
             azure_deployment=os.getenv("AZURE_OPENAI_EMBED_DEPLOYMENT", "text-embedding-3-small"),
             api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-01-preview"),
+            **budget,
         )
     from langchain_openai import OpenAIEmbeddings
 
@@ -63,10 +66,16 @@ def embedding_model():
             base_url=os.getenv("NEBIUS_BASE_URL", "https://api.studio.nebius.ai/v1"),
             api_key=os.getenv("NEBIUS_API_KEY"),
             check_embedding_ctx_length=False,  # non-OpenAI endpoint: skip tiktoken re-chunking
+            **budget,
         )
+    base_url = os.getenv("OPENAI_BASE_URL") or None
     return OpenAIEmbeddings(
         model=os.getenv("OPENAI_EMBED_MODEL", "text-embedding-3-small"),
-        base_url=os.getenv("OPENAI_BASE_URL") or None,
+        base_url=base_url,
+        # a non-OpenAI backend (local Ollama/vLLM) doesn't share tiktoken; skip
+        # ctx re-chunking there, but keep it for real OpenAI (base_url unset).
+        check_embedding_ctx_length=base_url is None,
+        **budget,
     )
 
 

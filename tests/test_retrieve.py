@@ -6,8 +6,10 @@ semantic recall. Real semantic behaviour is exercised in the integration/live la
 """
 from pathlib import Path
 
+import pytest
+
 from finhelp_guard.retrieve import (BM25Retriever, DenseRetriever, Doc, HashingEmbedder,
-                                    HybridRetriever, load_kb, rrf_fuse)
+                                    HybridRetriever, load_kb, make_embedder, rrf_fuse)
 
 ROOT = Path(__file__).resolve().parents[1]
 KB = ROOT / "data" / "kb_synthetic.jsonl"
@@ -56,8 +58,20 @@ def test_hybrid_surfaces_lexical_exact_match():
 
 
 # --- load_kb factory: default stays bm25; hybrid opt-in runs keyless ---
-def test_load_kb_defaults_to_bm25():
+def test_load_kb_defaults_to_bm25(monkeypatch):
+    monkeypatch.delenv("FINHELP_RETRIEVER", raising=False)  # assert the *default*, not ambient env
     assert isinstance(load_kb(KB), BM25Retriever)
+
+
+def test_unknown_retriever_mode_raises():
+    with pytest.raises(ValueError):
+        load_kb(KB, mode="bogus")
+
+
+def test_unknown_embedder_raises(monkeypatch):
+    monkeypatch.setenv("FINHELP_EMBEDDER", "providr")  # typo must fail loudly, not degrade
+    with pytest.raises(ValueError):
+        make_embedder()
 
 
 def test_load_kb_hybrid_mode_runs_keyless(monkeypatch):
@@ -68,7 +82,8 @@ def test_load_kb_hybrid_mode_runs_keyless(monkeypatch):
     assert 1 <= len(hits) <= 2 and all(isinstance(h, str) for h in hits)
 
 
-def test_bm25_still_retrieves_on_keyword():
+def test_bm25_still_retrieves_on_keyword(monkeypatch):
+    monkeypatch.delenv("FINHELP_RETRIEVER", raising=False)
     kb = load_kb(KB)  # default bm25
     hits = kb.retrieve("withdrawal fee", k=2, lang="en")
     assert hits and any("fee" in h.lower() for h in hits)
