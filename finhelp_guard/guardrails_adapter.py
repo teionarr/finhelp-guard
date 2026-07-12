@@ -52,14 +52,23 @@ NoUnlicensedAdvice = _validator_from_rail(no_advice_rail, "finhelp/no_unlicensed
 Groundedness = _validator_from_rail(groundedness_rail, "finhelp/groundedness")
 
 
+def _use(guard: Guard, validator_cls) -> Guard:
+    # guardrails moved `on_fail` from Guard.use() onto the validator across
+    # versions; support both so a minor upgrade can't break the lane.
+    try:
+        return guard.use(validator_cls(on_fail="noop"))   # newer: on_fail on the validator
+    except TypeError:
+        return guard.use(validator_cls, on_fail="noop")   # older: on_fail on .use()
+
+
 def build_guard() -> Guard:
     """A real Guardrails `Guard` running both finhelp rails (on_fail=noop so the
-    caller decides; swap to 'fix' to auto-apply the deflection, 'exception' to block)."""
-    return (
-        Guard()
-        .use(NoUnlicensedAdvice, on_fail="noop")
-        .use(Groundedness, on_fail="noop")
-    )
+    caller decides; a validator's on_fail can be 'fix' to auto-apply the
+    deflection, or 'exception' to hard-block)."""
+    guard = Guard()
+    for validator_cls in (NoUnlicensedAdvice, Groundedness):
+        guard = _use(guard, validator_cls)
+    return guard
 
 
 def validate_draft(draft: str, contexts: List[str], judge=None):

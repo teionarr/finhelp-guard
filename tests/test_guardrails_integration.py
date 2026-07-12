@@ -27,6 +27,8 @@ def test_guard_blocks_ungrounded_reply():
 
 
 def test_build_guard_composes_both_validators():
-    guard = build_guard()
-    # A Guard with our two registered validators attached.
-    assert guard is not None and len(guard._validators) == 2
+    # Behavioural check (robust to guardrails internals): one Guard enforces BOTH
+    # rails — an advice violation and a groundedness violation are each caught.
+    assert build_guard() is not None
+    assert validate_draft("You should buy Tesla now.", []).validation_passed is False
+    assert validate_draft("The fee is $999.", ["the fee is $5"]).validation_passed is False

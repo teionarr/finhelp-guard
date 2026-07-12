@@ -2,4 +2,4 @@
 # adapter test runs our rails inside a standard Guard(). Heavier; kept off the
 # fast unit lane on purpose.
 -r requirements-dev.txt
-guardrails-ai>=0.6
+guardrails-ai==0.6.8   # pinned to the verified API (the adapter also tolerates newer .use signatures)
