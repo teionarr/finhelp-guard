@@ -1,8 +1,9 @@
 """Model + judge factory for the LIVE pipeline.
 
-Kept out of the offline import path. Azure OpenAI is the default (matches a
-common enterprise setup); an OpenAI-compatible local server (Ollama/vLLM) is the
-no-cloud, reproducible fallback.
+Kept out of the offline import path. Azure OpenAI is used when
+AZURE_OPENAI_API_KEY is set (matches a common enterprise setup); otherwise it
+falls back to an OpenAI-compatible endpoint (OpenAI, or a local Ollama/vLLM
+server) for a no-cloud, reproducible run.
 """
 from __future__ import annotations
 
@@ -46,21 +47,22 @@ class LLMJudge(Judge):
         self._model = model or chat_model()
 
     def score(self, question: str, text: str, contexts: List[str]) -> tuple[float, str]:
-        from langchain_core.messages import HumanMessage, SystemMessage
+        import json
 
         ctx = "\n".join(f"- {c}" for c in contexts) or "(none)"
-        msg = [
-            SystemMessage(content=(
-                "You are a strict compliance reviewer. Answer only with a JSON "
-                'object {"score": <0..1>, "reason": "<short>"}. Higher score = the '
-                "concern in the question IS present.")),
-            HumanMessage(content=f"Question: {question}\n\nContext:\n{ctx}\n\nText:\n{text}"),
+        # LangChain chat models accept (role, content) tuples — no extra imports,
+        # and it keeps the judge trivially unit-testable with a fake model.
+        messages = [
+            ("system",
+             "You are a strict compliance reviewer. Answer only with a JSON object "
+             '{"score": <0..1>, "reason": "<short>"}. Higher score = the concern in '
+             "the question IS present."),
+            ("human", f"Question: {question}\n\nContext:\n{ctx}\n\nText:\n{text}"),
         ]
-        raw = self._model.invoke(msg).content
-        import json
+        raw = self._model.invoke(messages).content
         try:
             d = json.loads(raw)
             return float(d["score"]), str(d.get("reason", ""))
         except Exception:
             # Fail safe: if the judge is unparseable, treat as concern-present.
-            return 1.0, f"unparseable judge output: {raw[:120]}"
+            return 1.0, f"unparseable judge output: {str(raw)[:120]}"

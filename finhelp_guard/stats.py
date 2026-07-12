@@ -46,10 +46,10 @@ def wilson_interval(successes: int, n: int, z: float = Z_95) -> Interval:
 
 @dataclass(frozen=True)
 class McNemarResult:
-    b: int  # A pass, B fail
-    c: int  # A fail, B pass
+    b: int  # A correct, B wrong
+    c: int  # A wrong, B correct
     p_value: float
-    statistic: float  # discordant-pair count used
+    n_discordant: int  # b + c
 
     @property
     def significant(self) -> bool:
@@ -66,8 +66,8 @@ def mcnemar_exact(b: int, c: int) -> McNemarResult:
         raise ValueError("b and c must be non-negative")
     n = b + c
     if n == 0:
-        return McNemarResult(b, c, 1.0, 0.0)
+        return McNemarResult(b, c, 1.0, 0)
     k = min(b, c)
     tail = sum(math.comb(n, i) for i in range(0, k + 1)) * (0.5 ** n)
     p = min(1.0, 2.0 * tail)
-    return McNemarResult(b, c, p, float(k))
+    return McNemarResult(b, c, p, n)

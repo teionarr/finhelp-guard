@@ -12,7 +12,8 @@ import this module.
 """
 from __future__ import annotations
 
-from typing import List, Optional, TypedDict
+from pathlib import Path
+from typing import List, TypedDict
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
@@ -23,10 +24,11 @@ from .models import LLMJudge, chat_model
 from .rails import DEFAULT_RAILS, run_gate
 from .retrieve import load_kb
 
+ROOT = Path(__file__).resolve().parents[1]
+
 
 class Draft(BaseModel):
-    answer: str = Field(description="the reply to the customer")
-    citations: List[str] = Field(default_factory=list, description="KB snippets used")
+    answer: str = Field(description="the reply to the customer, grounded in the context")
 
 
 class State(TypedDict, total=False):
@@ -39,7 +41,7 @@ class State(TypedDict, total=False):
     final: str
 
 
-def build_graph(kb_path: str = "data/kb_synthetic.jsonl"):
+def build_graph(kb_path: str | Path = ROOT / "data" / "kb_synthetic.jsonl"):
     kb = load_kb(kb_path)
     llm = chat_model()
     drafter = llm.with_structured_output(Draft)
@@ -68,33 +70,39 @@ def build_graph(kb_path: str = "data/kb_synthetic.jsonl"):
                 repaired = r.fix_value
         return {"gate_passed": out.passed, "failed_rails": out.failed_rails, "draft": repaired}
 
-    def human_handoff(s: State) -> State:
-        # Structural HITL: a person approves before anything is sent. The graph
-        # pauses here and resumes with Command(resume=...).
+    def human_review(s: State) -> State:
+        # A rail flagged this reply. Structural HITL: a person must approve before
+        # anything is sent. The graph pauses here and resumes with Command(resume=...).
         decision = interrupt({
-            "review": s["draft"],
-            "gate_passed": s.get("gate_passed"),
+            "needs_review": s["draft"],
             "failed_rails": s.get("failed_rails"),
         })
         return {"final": s["draft"] if decision == "approve" else ""}
 
+    def mark_ready(s: State) -> State:
+        # Clean + grounded + no-advice → eligible to send. A stricter regulated
+        # deployment can still route these to review; that's a one-line change to
+        # `route`, which is exactly why this is a real branch and not a straight edge.
+        return {"final": s["draft"]}
+
     def route(s: State) -> str:
-        # Clean, grounded, no-advice replies could auto-send in a mature setup;
-        # here everything goes through review — assist, never auto-send.
-        return "human_handoff"
+        return "mark_ready" if s.get("gate_passed") else "human_review"
 
     g = StateGraph(State)
     g.add_node("detect_language", detect_language)
     g.add_node("retrieve", retrieve)
     g.add_node("draft", draft)
     g.add_node("guardrail_gate", guardrail_gate)
-    g.add_node("human_handoff", human_handoff)
+    g.add_node("human_review", human_review)
+    g.add_node("mark_ready", mark_ready)
 
     g.add_edge(START, "detect_language")
     g.add_edge("detect_language", "retrieve")
     g.add_edge("retrieve", "draft")
     g.add_edge("draft", "guardrail_gate")
-    g.add_conditional_edges("guardrail_gate", route, {"human_handoff": "human_handoff"})
-    g.add_edge("human_handoff", END)
+    g.add_conditional_edges("guardrail_gate", route,
+                            {"mark_ready": "mark_ready", "human_review": "human_review"})
+    g.add_edge("mark_ready", END)
+    g.add_edge("human_review", END)
 
     return g.compile(checkpointer=MemorySaver())

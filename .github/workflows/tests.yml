@@ -18,7 +18,7 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - name: unit tests
         run: pytest -q
-      - name: eval gate (must be GREEN)
+      - name: eval gate (dev must be GREEN)
         run: python evals/run_evals.py
       - name: gate catches a regression (must be RED)
         run: |
@@ -27,3 +27,5 @@ jobs:
           else
             echo "gate correctly went red on the injected regression"
           fi
+      - name: paired McNemar comparison (informational)
+        run: python evals/run_evals.py --compare

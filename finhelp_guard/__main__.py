@@ -2,7 +2,7 @@
 
 Shows the guardrail gate doing its job on three cases: a benign grounded reply
 (passes), an advice-seeking case (refused with a compliant deflection), and an
-ungrounded fee (blocked).
+ungrounded figure (blocked).
 """
 from __future__ import annotations
 
