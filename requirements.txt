@@ -1,10 +1,11 @@
 # Live pipeline (the offline demo/evals/tests need NONE of these).
 # Pin loosely; these are the swap-in points for the illustrative offline stubs.
-langgraph>=1.0
+guardrails-ai>=0.6         # real guardrails framework — see finhelp_guard/guardrails_adapter.py
+langgraph>=1.0             # agent orchestration (finhelp_guard/graph.py)
 langchain>=0.3
 langchain-openai>=0.2      # AzureChatOpenAI / ChatOpenAI
-ragas>=0.2                 # Faithfulness rail (live)
+ragas>=0.2                 # Faithfulness judge (live groundedness)
 deepeval>=1.0              # MisuseMetric / FaithfulnessMetric (live)
 statsmodels>=0.14          # cross-check for the pure-Python stats
 langfuse>=3.0              # tracing (optional)
-# presidio-analyzer / presidio-anonymizer  # PII rail (stretch)
+# presidio-analyzer / presidio-anonymizer  # PII rail (stretch; needs a spaCy model)

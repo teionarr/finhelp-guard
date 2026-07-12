@@ -3,7 +3,9 @@
 **A portable eval + guardrail harness for a support-ops assistant at a regulated broker.**
 The agent is deliberately thin; the point is the *harness* — the rails, the interval-based acceptance criteria, and the regression gate that let you ship an AI ops-assist tool a compliance officer would sign off on.
 
-![tests](https://img.shields.io/badge/tests-24%20passing-brightgreen) ![license](https://img.shields.io/badge/license-MIT-green) ![python](https://img.shields.io/badge/python-3.10+-blue) ![data](https://img.shields.io/badge/data-synthetic%20%2B%20public-lightgrey)
+![tests](https://img.shields.io/badge/tests-28%20passing-brightgreen) ![license](https://img.shields.io/badge/license-MIT-green) ![python](https://img.shields.io/badge/python-3.10+-blue) ![data](https://img.shields.io/badge/data-synthetic%20%2B%20public-lightgrey) ![built with](https://img.shields.io/badge/built%20with-Guardrails%20AI%20%C2%B7%20LangGraph%20%C2%B7%20BM25-8a2be2)
+
+**Composes the standard OSS stack, not a from-scratch reinvention.** The same rail logic runs three ways — a dependency-free gate (fast, keyless), inside a real [Guardrails AI](https://github.com/guardrails-ai/guardrails) `Guard()`, or behind an LLM judge ([DeepEval](https://github.com/confident-ai/deepeval) / [Ragas](https://github.com/explodinggradients/ragas)); retrieval is [rank_bm25](https://github.com/dorianbrown/rank_bm25), orchestration is [LangGraph](https://github.com/langchain-ai/langgraph). You pick the stack; the rules and acceptance criteria stay identical.
 
 > ⚠️ **Illustrative system-under-test — read this first (Portability & Scope).**
 > This is a **methodology demonstrated on a throwaway agent**, *not* a proposed production stack and *not* affiliated with any broker. In a real environment the system-under-test is your existing support stack (e.g. Salesforce Service Cloud + Einstein, or an in-house LLM) — what ports is the **harness**: the guardrail rails, the acceptance criteria, the statistics, and the CI gate, all stack-agnostic. I built a small LangGraph agent only so there'd be something to evaluate.
@@ -18,10 +20,20 @@ python -m finhelp_guard --demo          # run the pipeline offline on 3 cases
 python evals/run_evals.py               # dev gate (GREEN) + held-out report
 python evals/run_evals.py --inject-regression   # disable a rail -> dev gate RED
 python evals/run_evals.py --compare     # paired McNemar: full vs regressed rails
-pip install -r requirements-dev.txt && pytest -q   # 24 tests
+pip install -r requirements-dev.txt && pytest -q   # 24 unit tests (keyless)
+
+# run the same rails inside the real Guardrails AI framework:
+pip install -r requirements-integration.txt && pytest -q tests/test_guardrails_integration.py
 ```
 
-The offline path is pure-Python (no model calls), so demo, evals, and tests run and **reproduce the scorecard** with no keys and no cost.
+The offline path is pure-Python (no model calls), so demo, evals, and tests run and **reproduce the scorecard** with no keys and no cost. CI runs two lanes — a fast keyless **unit** lane (the badge) and an **integration** lane that installs Guardrails AI and runs our rails inside a standard `Guard()`.
+
+## The same rules, three runtimes (this is the "compose, don't reinvent" point)
+The rail logic in `finhelp_guard/rails/` is written once and reused everywhere:
+1. **Offline gate** (`rails.run_gate`) — deterministic, zero deps, gates CI.
+2. **Guardrails AI** (`guardrails_adapter.py`) — the *same* rails registered as real `guardrails` Validators in a `Guard()`; drop-in for a Guardrails-AI shop, publishable to the Hub.
+3. **LLM-judge** — inject a judge (DeepEval `MisuseMetric` / Ragas `Faithfulness`) via the same `Judge` contract for the paraphrase/no-digit cases the deterministic rails can't catch.
+One definition of "what's allowed," three ways to enforce it. That is the operations-tooling skill: complex ecosystem underneath, one simple contract on top.
 
 ## What the scorecard actually claims (and doesn't)
 
@@ -71,7 +83,8 @@ A **rail** is a pure function `(draft, contexts) -> RailResult`; the gate runs t
 |---|---|
 | Interval-based acceptance gate, Wilson/McNemar stats, dev/held-out split, regression-in-CI | **production-grade** (the methodology) |
 | Rail contract + gate + `--compare` McNemar | **production-grade** |
-| Deterministic offline rails, TF-IDF retriever, synthetic KB | **illustrative** (swap for LLM-judge + vector store + your KB) |
+| Guardrails AI adapter (rails as real Validators in a `Guard()`) + BM25 retrieval (`rank_bm25`) | **real integrations** (run in CI) |
+| Deterministic offline rails, synthetic KB | **illustrative** (swap the detectors for the LLM judge + your KB/vector store) |
 | EN + ES coverage | **illustrative** — further languages need the live judge |
 | PII redaction (Presidio), Langfuse tracing, live Azure/OpenAI path | **stretch** (interfaces sketched; the live graph is unit-tested with a fake model, not run against a real LLM here) |
 

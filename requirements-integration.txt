@@ -1,0 +1,5 @@
+# Integration lane: the fast deps plus the real Guardrails AI framework, so the
+# adapter test runs our rails inside a standard Guard(). Heavier; kept off the
+# fast unit lane on purpose.
+-r requirements-dev.txt
+guardrails-ai>=0.6

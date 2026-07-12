@@ -1,4 +1,8 @@
-# Tier A — deterministic, no keys, no spend. Green on every push/PR.
+# Two lanes:
+#   unit        — deterministic, no keys, no spend. The fast lane / the badge.
+#   integration — installs the real Guardrails AI framework and runs our rails
+#                 inside a standard Guard(). Heavier; kept separate so a churny
+#                 framework dep can't break the core lane.
 name: tests
 on:
   push: { branches: [main] }
@@ -6,17 +10,17 @@ on:
 permissions:
   contents: read
 jobs:
-  test:
+  unit:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements-dev.txt
-      - name: unit tests
+      - name: unit tests (integration test auto-skips without guardrails)
         run: pytest -q
       - name: eval gate (dev must be GREEN)
         run: python evals/run_evals.py
@@ -29,3 +33,16 @@ jobs:
           fi
       - name: paired McNemar comparison (informational)
         run: python evals/run_evals.py --compare
+
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements-integration.txt
+      - name: rails run inside the real Guardrails AI Guard()
+        run: pytest -q tests/test_guardrails_integration.py
