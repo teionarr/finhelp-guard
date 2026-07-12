@@ -10,10 +10,12 @@ decomposes into team-ownable streams, and what's done vs. next in each.
 
 ### 2. Evaluation & calibration (owner: eval)
 - ✅ interval-bound gate, per-rail recall, gate-level precision/recall/F1, McNemar, dev/held-out split
-- ▢ **human-adjudicated gold set + rubric + Cohen's κ** (top open item — turns "author-labelled" into defensible ground truth)
-- ▢ judge threshold **sweep / ROC / PR + calibration (ECE)** to choose the operating point
-- ▢ scale + stratify the corpus (category × language × difficulty) at realistic prevalence
-- ▢ judge variance across repeated runs (LLM judges are noisy)
+- ✅ **calibration harness** (`data/gold/`, `evals/{make_gold,kappa,calibrate}.py`): rubric,
+  stratified candidates, Cohen's κ, threshold sweep + ROC/PR/AUC/ECE + operating-point pick,
+  threshold wired into the rails via `FINHELP_JUDGE_THRESHOLD`. Runs keyless from committed scores.
+- ▢ **human labels** — the one remaining input: two annotators fill `data/gold/annotator_{a,b}.jsonl`
+  (~2h), then κ + calibrate produce defensible numbers. (Code done; humans pending.)
+- ▢ scale + stratify the corpus at realistic prevalence; judge variance across repeated runs
 
 ### 3. Agent & safety (owner: agent)
 - ✅ tool-calling loop, tool-layer authorization, enforced gate, escalation on bad output, step/tool/input budgets

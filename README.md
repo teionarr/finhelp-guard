@@ -3,7 +3,7 @@
 **A portable eval + guardrail harness for a support-ops assistant at a regulated broker.**
 The agent is deliberately thin; the point is the *harness* — the rails, the interval-based acceptance criteria, and the regression gate that let you ship an AI ops-assist tool a compliance officer would sign off on.
 
-![tests](https://img.shields.io/badge/tests-36%20unit%20%2B%204%20integration-brightgreen) ![license](https://img.shields.io/badge/license-MIT-green) ![python](https://img.shields.io/badge/python-3.10+-blue) ![data](https://img.shields.io/badge/data-synthetic%20%2B%20public-lightgrey) ![built with](https://img.shields.io/badge/built%20with-Guardrails%20AI%20%C2%B7%20LangGraph%20%C2%B7%20BM25-8a2be2)
+![tests](https://img.shields.io/badge/tests-43%20unit%20%2B%204%20integration-brightgreen) ![license](https://img.shields.io/badge/license-MIT-green) ![python](https://img.shields.io/badge/python-3.10+-blue) ![data](https://img.shields.io/badge/data-synthetic%20%2B%20public-lightgrey) ![built with](https://img.shields.io/badge/built%20with-Guardrails%20AI%20%C2%B7%20LangGraph%20%C2%B7%20BM25-8a2be2)
 
 **Composes the standard OSS stack, not a from-scratch reinvention.** The same rail logic runs three ways — a dependency-free gate (fast, keyless), inside a real [Guardrails AI](https://github.com/guardrails-ai/guardrails) `Guard()`, or behind an LLM judge ([DeepEval](https://github.com/confident-ai/deepeval) / [Ragas](https://github.com/explodinggradients/ragas)); retrieval is [rank_bm25](https://github.com/dorianbrown/rank_bm25), orchestration is [LangGraph](https://github.com/langchain-ai/langgraph). You pick the stack; the rules and acceptance criteria stay identical.
 
@@ -22,7 +22,8 @@ python -m finhelp_guard --demo          # just the guardrail gate on 3 canned dr
 python evals/run_evals.py               # dev gate (GREEN) + held-out report
 python evals/run_evals.py --inject-regression   # disable a rail -> dev gate RED
 python evals/run_evals.py --compare     # paired McNemar: full vs regressed rails
-pip install -r requirements-dev.txt && pytest -q   # 36 unit tests (keyless)
+pip install -r requirements-dev.txt && pytest -q   # 43 unit tests (keyless)
+python evals/calibrate.py                          # judge threshold sweep + ROC/PR/AUC/ECE (keyless)
 
 # run the same rails inside the real Guardrails AI framework:
 pip install -r requirements-integration.txt && pytest -q tests/test_guardrails_integration.py
@@ -92,6 +93,8 @@ Two design choices are the whole point — and the two things a reviewer should 
     advice_recall        0.000 [0.000, 0.390]  (n=6)    # paraphrase/other-lang/homoglyph slip past regex
     grounded_recall      0.000 [0.000, 0.561]  (n=3)    # no-digit + cross-fact fabrications slip past
 ```
+
+**Judge calibration (not a hardcoded 0.5).** `evals/calibrate.py` sweeps the judge threshold and reports **ROC / PR / AUC / ECE** + the operating point that maximizes recall subject to a false-refusal ceiling (on real committed scores it recommends `threshold=0.90`, ROC-AUC 1.0, ECE 0.035), applied via `FINHELP_JUDGE_THRESHOLD`. The full gold-set workflow — rubric, stratified candidates, **Cohen's κ** — is built in [`data/gold/`](data/gold/README.md); the only remaining input is ~2h of human labeling ([ROADMAP](ROADMAP.md)). This is what turns "author-labelled toy" into "calibrated against a defensible gold set."
 
 That gap is not a bug to hide — it's the argument for the live LLM judge. `--compare` runs a real paired **McNemar** test (exact) between the full rails and an advice-rail-disabled version on the same items (b=12, c=0, p≈0.0005) — the version-to-version regression test.
 

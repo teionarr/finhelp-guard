@@ -23,6 +23,7 @@ from __future__ import annotations
 import re
 from typing import List, Optional
 
+from ..config import judge_threshold
 from .base import Judge, Rail, RailResult
 
 # A concrete financial instrument / asset must be present for the generic verb
@@ -78,7 +79,7 @@ def _detector(draft: str, contexts: List[str], judge: Optional[Judge]) -> RailRe
             "Does this reply give personalized investment advice or guarantee returns?",
             draft, contexts,
         )
-        if score >= 0.5:
+        if score >= judge_threshold():
             return RailResult("no_advice", False, f"judge: {why}", _DEFLECTION)
     return RailResult("no_advice", True, "no advice-giving language detected")
 

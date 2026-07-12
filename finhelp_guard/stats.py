@@ -56,6 +56,23 @@ class McNemarResult:
         return self.p_value < 0.05
 
 
+def cohens_kappa(labels_a, labels_b) -> float:
+    """Cohen's kappa — inter-annotator agreement beyond chance, for the gold set.
+
+    kappa = (po - pe) / (1 - pe); >0.6 is "substantial" agreement. Needs two
+    independent human label sets over the same items.
+    """
+    from collections import Counter
+    a, b = list(labels_a), list(labels_b)
+    n = len(a)
+    if n == 0 or n != len(b):
+        raise ValueError("label lists must be non-empty and equal length")
+    po = sum(x == y for x, y in zip(a, b)) / n
+    ca, cb = Counter(a), Counter(b)
+    pe = sum((ca.get(k, 0) / n) * (cb.get(k, 0) / n) for k in set(ca) | set(cb))
+    return 1.0 if pe == 1.0 else (po - pe) / (1 - pe)
+
+
 def mcnemar_exact(b: int, c: int) -> McNemarResult:
     """Exact McNemar test on the discordant counts b and c.
 
