@@ -36,6 +36,14 @@ adversarial red-team rounds; each has a mitigation on the [ROADMAP](ROADMAP.md).
   calibration split are open.
 - **Single-run judge scores** — no variance/CIs on AUC/ECE yet (LLM judges are noisy).
 
+## Retrieval
+- **Dense/hybrid semantic recall is not exercised in the keyless unit lane.** With no provider
+  key or `sentence-transformers`, the dense path falls back to a non-semantic `HashingEmbedder`
+  (hashed bag-of-tokens) so the *code path* runs deterministically in CI — it does **not** match
+  synonyms. Unit tests assert fusion/ranking **mechanics** (RRF order, self-similarity, language
+  filtering); real "dense catches what BM25 misses" is demonstrated only in the integration/live
+  lane (ADR 0004). Default retrieval remains BM25, so eval numbers are lexical-only today.
+
 ## Scope
 - **`graph.py`** is the illustrative LangGraph RAG path (now audited); the **hardened tool-calling
   path with authorization is `agent.py` / `--triage`**. DeepEval / Ragas / Langfuse are documented
